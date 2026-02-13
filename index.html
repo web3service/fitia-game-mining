@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin FITIA</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: white; padding: 20px; text-align: center; }
+        .container { max-width: 500px; margin: 0 auto; background: #2a2a2a; padding: 30px; border-radius: 10px; }
+        h2 { color: #00ff9d; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #444; background: #111; color: white; font-size: 1.1rem; }
+        button { background: #00ff9d; color: #000; border: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1rem; width: 100%; margin-top: 10px; }
+        button:hover { background: #00cc6a; }
+        .section { border-top: 1px solid #444; padding-top: 20px; margin-top: 20px; }
+        .info { color: #888; font-size: 0.9rem; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Panneau Admin FITIA</h2>
+    <p class="info">Cette page vous permet de gérer le contrat en direct.</p>
+
+    <!-- CHANGER DIFFICULTÉ -->
+    <div class="section">
+        <h3>1. Changer Difficulté</h3>
+        <p class="info">1.0 = Normal | 0.001 = Diviser par 1000</p>
+        <input type="number" id="diff-val" placeholder="Ex: 0.001">
+        <button onclick="setDifficulty()">VALIDER LA CHANCE</button>
+    </div>
+
+    <!-- CHANGER TAUX -->
+    <div class="section">
+        <h3>2. Changer Taux de Change</h3>
+        <input type="number" id="rate-val" placeholder="Ex: 100">
+        <button onclick="setRate()">VALIDER LE TAUX</button>
+    </div>
+
+    <!-- RETRAIRER USDT -->
+    <div class="section">
+        <h3>3. Retirer USDT (Vers votre wallet)</h3>
+        <input type="number" id="withdraw-val" placeholder="Montant USDT">
+        <button onclick="withdraw()">RETIRER LES FONDS</button>
+    </div>
+
+</div>
+
+<script>
+    // CONFIGURATION
+    const CONTRACT_ADDRESS = "VOTRE_ADRESSE_CONTRAT_DEPLOYE_ICI";
+    const ABI = [
+        "function setDifficulty(uint256 _newMultiplier)",
+        "function setExchangeRate(uint256 _newRate)",
+        "function withdrawUsdt(uint256 _amount)"
+    ];
+
+    // FONCTION POUR SE CONNECTER
+    async function connectToBlockchain() {
+        // Demander la clé privée à l'utilisateur
+        const pk = prompt("Entrez votre Clé Privée (MetaMask -> Détails du compte -> Exporter) :");
+        
+        if (!pk || pk.length !== 64) {
+            alert("Clé privée invalide.");
+            return null;
+        }
+
+        try {
+            const provider = new ethers.JsonRpcProvider("https://polygon-rpc.com");
+            const wallet = new ethers.Wallet(pk, provider);
+            const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+            return contract;
+        } catch (e) {
+            alert("Erreur de connexion : " + e.message);
+            return null;
+        }
+    }
+
+    // ACTION 1 : CHANGER DIFFICULTÉ
+    async function setDifficulty() {
+        const val = document.getElementById('diff-val').value;
+        if(!val) return alert("Entrez une valeur");
+
+        const contract = await connectToBlockchain();
+        if(!contract) return;
+
+        try {
+            const tx = await contract.setDifficulty(ethers.parseEther(val));
+            alert("Transaction envoyée ! En attente de confirmation...");
+            await tx.wait();
+            alert("Succès ! Difficulté changée.");
+        } catch(e) { alert("Erreur : " + e.reason); }
+    }
+
+    // ACTION 2 : CHANGER TAUX
+    async function setRate() {
+        const val = document.getElementById('rate-val').value;
+        if(!val) return alert("Entrez une valeur");
+
+        const contract = await connectToBlockchain();
+        if(!contract) return;
+
+        try {
+            const tx = await contract.setExchangeRate(ethers.parseUnits(val, 8));
+            alert("Transaction envoyée !");
+            await tx.wait();
+            alert("Succès ! Taux changé.");
+        } catch(e) { alert("Erreur : " + e.reason); }
+    }
+
+    // ACTION 3 : RETRAIT
+    async function withdraw() {
+        const amount = document.getElementById('withdraw-val').value;
+        if(!amount) return alert("Entrez un montant");
+
+        const contract = await connectToBlockchain();
+        if(!contract) return;
+
+        try {
+            const tx = await contract.withdrawUsdt(ethers.parseUnits(amount, 6));
+            alert("Retrait en cours...");
+            await tx.wait();
+            alert("Fonds retirés avec succès !");
+        } catch(e) { alert("Erreur : " + e.reason); }
+    }
+</script>
+
+</body>
+</html>
