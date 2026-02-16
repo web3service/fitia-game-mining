@@ -47,7 +47,7 @@ class Application {
         this.currentRate = 0;
         this.payMode = 'USDT'; 
         this.swapDirection = 'USDT_TO_FTA';
-        this.ftaDecimals = 18;
+        this.ftaDecimals = 18; 
         this.currentRealPower = 0;
         this.pendingBalance = 0;    
         this.miningTimer = null;
@@ -152,7 +152,7 @@ class Application {
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
             document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
 
-            // 4. Shop (Seulement si vide)
+            // 4. Shop
             await this.renderShop();
             
             // 5. Games
@@ -177,7 +177,7 @@ class Application {
     }
     stopMiningCounter() { if (this.miningTimer) { clearInterval(this.miningTimer); this.miningTimer = null; } }
 
-    // --- BOUTIQUE (CORRECTION CLIGNOTEMENT) ---
+    // --- BOUTIQUE (VERROUILLAGE ANTI-BUG) ---
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
@@ -189,7 +189,7 @@ class Application {
         if (this.isLoadingShop) return; // Verrou actif
         if (this.shopData.length > 0 && !force) return; // Déjà chargé
 
-        this.isLoadingShop = true; // Activation du verrou
+        this.isLoadingShop = true; // Activation
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
@@ -250,7 +250,7 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
-            this.renderShop(true); // Refresh boutique
+            this.renderShop(true); 
             this.updateData();
         } catch (e) { this.showError(e); }
         this.setLoader(false);
@@ -326,7 +326,7 @@ class Application {
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < amount) await (await this.contracts.fta.approve(CONFIG.MINING, amount)).wait();
             await (await this.contracts.mining.playWinGo(amount, type, choice)).wait();
-            this.showToast("Jeu terminé ! Vérifiez votre solde.");
+            this.showToast("Jeu terminé !");
             this.updateData();
         } catch(e) { this.showError(e); }
         this.setLoader(false);

@@ -72,14 +72,57 @@ main::-webkit-scrollbar { display: none; }
 .pulse-ring { position: absolute; top:-50%; left:-50%; width:200%; height:200%; background: rgba(255,255,255,0.2); border-radius: 40%; animation: pulse 3s infinite; }
 @keyframes pulse { 0% { transform: scale(0.8); opacity: 0; } 70% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.2); opacity: 0; } }
 
-.btn-primary { width: 100%; background: var(--primary); color: #fff; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; }
-.row-between { display: flex; justify-content: space-between; font-size: 1rem; }
-.balance { font-family: monospace; font-weight: bold; }
+.btn-primary { width: 100%; background: var(--primary); color: #fff; border: none; padding: 14px; border-radius: 12px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+.btn-primary:active { opacity: 0.8; }
 
-/* VISUALIZER */
-.visualizer-wrap { position: relative; height: 120px; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 25px; border: 1px solid #333; }
-#mining-canvas { width: 100%; height: 100%; display: block; }
-.viz-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; letter-spacing: 2px; color: #666; font-size: 0.9rem; }
+/* STRUCTURE PROPRE : Chiffres à Gauche / Token à Droite */
+.row-between { display: flex; justify-content: space-between; align-items: center; font-size: 1rem; }
+.balance { font-family: monospace; font-weight: bold; text-align: right; }
+
+/* SWAP INTERFACE - STRUCTURE PRO */
+.swap-interface { padding: 20px; }
+
+/* Ligne Header (ex: "Vous payez" | "Solde") */
+.swap-header { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; }
+.swap-header span:last-child { text-align: right; }
+
+/* Le conteneur flexible */
+.input-wrap { 
+    display: flex; 
+    align-items: center; 
+    background: rgba(0,0,0,0.2); 
+    border: 1px solid rgba(255,255,255,0.1); 
+    border-radius: 12px; 
+    padding: 0 5px; /* Espace interne */
+    margin-bottom: 10px; 
+}
+
+/* L'input : Prend tout l'espace restant, texte à GAUCHE */
+.input-wrap input { 
+    flex: 1; 
+    background: none; 
+    border: none; 
+    color: var(--text); 
+    font-size: 1.4rem; 
+    padding: 15px 10px; 
+    text-align: left; /* CHIFFRES À GAUCHE */
+    font-family: 'Courier New', monospace;
+}
+
+/* Le bouton Token : Ancré à DROITE */
+.token-select { 
+    background: rgba(255,255,255,0.1); 
+    padding: 10px 15px; 
+    border-radius: 8px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    white-space: nowrap; /* Empêche le token de couper */
+    margin-left: 10px; /* Espace entre chiffres et token */
+}
+
+.swap-arrow-wrap { text-align: center; height: 20px; margin: 5px 0; }
+.swap-arrow { display: inline-block; padding: 5px 12px; background: var(--bg); border-radius: 50%; cursor: pointer; border: 1px solid #333; }
+.rate-info { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; }
 
 /* SHOP */
 .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -117,14 +160,10 @@ main::-webkit-scrollbar { display: none; }
 .btn-game { width: 100%; padding: 20px; background: linear-gradient(45deg, var(--accent), #8b5cf6); border: none; color: white; font-weight: bold; font-size: 1.1rem; border-radius: 12px; cursor: pointer; }
 .jackpot-display { font-size: 2.2rem; font-weight: 800; color: var(--primary); margin-bottom: 20px; font-family: monospace; }
 
-/* SWAP */
-.swap-interface { padding: 20px; }
-.swap-header { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; }
-.input-wrap { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; display: flex; padding: 5px; align-items: center; }
-.input-wrap input { flex: 1; background: none; border: none; color: var(--text); font-size: 1.3rem; padding: 10px; text-align: right; }
-.token-select { background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
-.swap-arrow { display: inline-block; padding: 5px 12px; background: var(--bg); border-radius: 50%; cursor: pointer; border: 1px solid #333; }
-.rate-info { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; }
+/* VISUALIZER */
+.visualizer-wrap { position: relative; height: 120px; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 25px; border: 1px solid #333; }
+#mining-canvas { width: 100%; height: 100%; display: block; }
+.viz-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; letter-spacing: 2px; color: #666; font-size: 0.9rem; }
 
 /* NAV */
 .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height); background: rgba(15, 23, 42, 0.95); border-top: 1px solid #333; display: flex; justify-content: space-around; align-items: center; z-index: 100; }
