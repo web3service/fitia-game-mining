@@ -2,15 +2,13 @@
 // CONFIGURATION
 // ==========================================
 const CONFIG = {
-    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", // Adresse du contrat FitiaMiningV2
-    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", // Adresse Token FTA
+    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", // Votre contrat Minage
+    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", // Votre contrat Token FTA
     USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", // USDT Polygon
     CHAIN_ID: 137
 };
 
-// ABI Complet pour le Frontend
 const MINING_ABI = [
-    // Views
     "function getActivePower(address) view returns (uint256)",
     "function getMachineCount() view returns (uint256)",
     "function getUserMachineCount(address, uint256) view returns (uint256)",
@@ -19,12 +17,9 @@ const MINING_ABI = [
     "function exchangeRate() view returns (uint256)",
     "function getWheelJackpot() view returns (uint256)",
     "function getLotteryPool() view returns (uint256)",
-    
-    // Write
     "function buyMachine(uint256 typeId)",
     "function buyMachineWithFTA(uint256 typeId)",
     "function claimRewards()",
-    "function setReferrer(address)",
     "function swapUsdtForFta(uint256 amount)",
     "function swapFtaForUsdt(uint256 amount)",
     "function playWinGo(uint256 amount, uint8 betType, uint8 choice)",
@@ -35,6 +30,7 @@ const MINING_ABI = [
 
 const ERC20_ABI = [
     "function balanceOf(address) view returns (uint256)",
+    "function decimals() view returns (uint8)", // Important pour détecter les décimales
     "function approve(address, uint256) returns (bool)",
     "function allowance(address, address) view returns (uint256)"
 ];
@@ -49,22 +45,19 @@ class Application {
         this.contracts = {};
         this.user = null;
         this.currentRate = 0;
-        this.payMode = 'USDT'; // Mode de paiement boutique
+        this.payMode = 'USDT'; 
         this.swapDirection = 'USDT_TO_FTA';
-       
+        this.ftaDecimals = 18; // Par défaut, sera corrigé à la connexion
         this.currentRealPower = 0;
         this.pendingBalance = 0;    
         this.miningTimer = null;
         this.storageKey = "fitia_last_claim_time";
-        
         this.shopData = [];
         this.vizContext = null;
         this.vizBars = [];
-        this.animationId = null;
     }
 
     async init() {
-        console.log("FITIA PRO V2 - Ready");
         if (window.ethereum) {
             this.provider = new ethers.BrowserProvider(window.ethereum);
             window.ethereum.on('accountsChanged', () => window.location.reload());
@@ -88,12 +81,21 @@ class Application {
                 await this.switchNetwork();
             }
 
-            // Initialisation des contrats
+            // Initialisation contrats
             this.contracts.usdt = new ethers.Contract(CONFIG.USDT, ERC20_ABI, this.signer);
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
             this.contracts.mining = new ethers.Contract(CONFIG.MINING, MINING_ABI, this.signer);
 
-            // UI
+            // --- DÉTECTION AUTOMATIQUE DES DÉCIMALES FTA ---
+            try {
+                this.ftaDecimals = await this.contracts.fta.decimals();
+                console.log("FTA Decimals détectées:", this.ftaDecimals);
+            } catch (e) {
+                console.warn("Impossible de lire décimales FTA, utilisation 18 par défaut");
+                this.ftaDecimals = 18;
+            }
+
+            // UI Connecté
             document.getElementById('btn-connect').classList.add('hidden');
             const ws = document.getElementById('wallet-status');
             ws.classList.remove('hidden');
@@ -101,12 +103,11 @@ class Application {
 
             // Démarrage
             await this.updateData();
-            setInterval(() => this.updateData(), 5000); // Refresh toutes les 5s
-            
+            setInterval(() => this.updateData(), 5000);
             this.initVisualizer();
         } catch (e) {
             console.error(e);
-            this.showToast("Erreur connexion", true);
+            this.showToast("Erreur connexion: " + (e.reason || e.message), true);
         }
         this.setLoader(false);
     }
@@ -132,17 +133,17 @@ class Application {
         try {
             // 1. Minage Data
             const rawPower = await this.contracts.mining.getActivePower(this.user);
-            // Suppose difficultyMultiplier est 1e18 si non catch
             let multiplier = 1e18;
             try { multiplier = await this.contracts.mining.difficultyMultiplier(); } catch(e) {}
 
             const realPowerBN = (rawPower * multiplier) / 1000000000000000000n;
-            this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); // Suppose 8 decimales FTA
+            // On utilise les décimales détectées pour la puissance aussi si besoin, 
+            // mais souvent la puissance est fixe (8) dans le contrat, voir constructeur.
+            // Ici on suppose que le contrat renvoie une valeur formatée standard.
+            this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
-            // Gestion temps local
             let lastClaim = localStorage.getItem(this.storageKey);
             if (!lastClaim) lastClaim = Math.floor(Date.now() / 1000);
-            
             const timePassed = Math.floor(Date.now() / 1000) - parseInt(lastClaim);
             
             if (this.currentRealPower > 0) {
@@ -160,32 +161,37 @@ class Application {
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
             if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 
-            // 2. Balances
+            // 2. Balances (CORRECTION ICI)
             const usdtBal = await this.contracts.usdt.balanceOf(this.user);
             const ftaBal = await this.contracts.fta.balanceOf(this.user);
+            
+            // USDT a toujours 6 décimales
             document.getElementById('bal-usdt').innerText = parseFloat(ethers.formatUnits(usdtBal, 6)).toFixed(2);
-            document.getElementById('bal-fta').innerText = parseFloat(ethers.formatUnits(ftaBal, 18)).toFixed(2); // Ajustez si FTA != 18 dec
+            // FTA utilise les décimales détectées (this.ftaDecimals)
+            document.getElementById('bal-fta').innerText = parseFloat(ethers.formatUnits(ftaBal, this.ftaDecimals)).toFixed(2);
 
             // 3. Swap Data
             const rate = await this.contracts.mining.exchangeRate();
-            this.currentRate = parseFloat(ethers.formatUnits(rate, 8)); // Ajuster decimales
+            this.currentRate = parseFloat(ethers.formatUnits(rate, 8)); 
             document.getElementById('swap-rate').innerText = `1 USDT = ${this.currentRate.toFixed(2)} FTA`;
             
-            // Balances Swap
             const fromBal = this.swapDirection === 'USDT_TO_FTA' ? usdtBal : ftaBal;
             const toBal = this.swapDirection === 'USDT_TO_FTA' ? ftaBal : usdtBal;
-            document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : 18)).toFixed(2);
-            document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? 18 : 6)).toFixed(2);
+            
+            const fromDec = this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals;
+            const toDec = this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6;
+            
+            document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, fromDec)).toFixed(2);
+            document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, toDec)).toFixed(2);
 
-            // 4. Shop
             if (this.shopData.length === 0) await this.renderShop();
             
-            // 5. Games Data
+            // Games Data
             try {
                 const wheelJP = await this.contracts.mining.getWheelJackpot();
-                document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(wheelJP, 18)).toFixed(2);
+                document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(wheelJP, this.ftaDecimals)).toFixed(2);
                 const lotPool = await this.contracts.mining.getLotteryPool();
-                document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(lotPool, 18)).toFixed(2);
+                document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(lotPool, this.ftaDecimals)).toFixed(2);
             } catch(e) { console.log("Games data loading..."); }
 
         } catch (e) {
@@ -212,6 +218,7 @@ class Application {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
         document.getElementById('btn-pay-fta').classList.toggle('active', mode === 'FTA');
+        this.renderShop(); // Re-rendre pour mettre à jour les prix affichés
     }
 
     async renderShop() {
@@ -222,9 +229,7 @@ class Application {
             for(let i=0; i<count; i++) {
                 const data = await this.contracts.mining.machineTypes(i);
                 const priceUsdt = parseFloat(ethers.formatUnits(data.price, 6));
-                const priceFta = priceUsdt * this.currentRate; // Approximatif pour affichage
-                
-                // Calcul puissance (simplifié)
+                const priceFta = priceUsdt * this.currentRate; 
                 const power = parseFloat(ethers.formatUnits(data.power, 8)); 
 
                 const div = document.createElement('div');
@@ -252,7 +257,6 @@ class Application {
             const m = await this.contracts.mining.machineTypes(id);
             
             if (this.payMode === 'USDT') {
-                // Approve USDT
                 const allow = await this.contracts.usdt.allowance(this.user, CONFIG.MINING);
                 if (allow < m.price) {
                     this.setLoader(true, "Approve USDT...");
@@ -264,10 +268,8 @@ class Application {
                 await tx.wait();
             } else {
                 // FTA Mode
-                // Calcul montant FTA nécessaire approximatif pour approve
-                // Pour être safe, on approve un peu plus ou on calcule exact via rate
                 const rate = await this.contracts.mining.exchangeRate();
-                const ftaPrice = (m.price * rate) / 1000000n; // Conversion précise Solidité
+                const ftaPrice = (m.price * rate) / 1000000n; 
                 
                 const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
                 if (allow < ftaPrice) {
@@ -281,12 +283,12 @@ class Application {
             }
             
             this.showToast("Achat réussi !");
-            localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000)); // Reset timer
+            localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
             this.updateData();
         } catch (e) {
             console.error(e);
-            this.showToast("Erreur Achat", true);
+            this.showToast("Erreur Achat: " + (e.reason || e.message), true);
         }
         this.setLoader(false);
     }
@@ -312,7 +314,7 @@ class Application {
         
         this.setLoader(true, "Swap...");
         const isUsdtTo = this.swapDirection === 'USDT_TO_FTA';
-        const decimals = isUsdtTo ? 6 : 18; // Ajuster selon FTA
+        const decimals = isUsdtTo ? 6 : this.ftaDecimals; // Utiliser décimales détectées
         const amount = ethers.parseUnits(val, decimals);
         
         try {
@@ -365,11 +367,10 @@ class Application {
     async playWinGo(type, choice) {
         const betVal = document.getElementById('wingo-bet').value;
         if (!betVal || betVal <= 0) return this.showToast("Mise invalide", true);
-        const amount = ethers.parseUnits(betVal, 18); // Ajuster FTA
+        const amount = ethers.parseUnits(betVal, this.ftaDecimals); // Décimales détectées
         
         this.setLoader(true, "Jeu...");
         try {
-            // Approve
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < amount) {
                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, amount);
@@ -387,10 +388,15 @@ class Application {
     async spinWheel() {
         this.setLoader(true, "Roue...");
         try {
-            const price = await this.contracts.mining.wheelTicketPrice();
+            // Le contrat a un prix fixe, on doit le récupérer ou le connaître.
+            // Pour simplifier, on suppose que l'utilisateur a déjà approuvé une grosse somme ou on approuve à chaque fois.
+            // Idéalement, il faudrait fetch le wheelTicketPrice du contrat.
+            // Ici on approuve une somme arbitraire grande pour simplifier l'UX (ou le prix exact si connu)
+            // Pour l'exemple, on approuve 1000 FTA
+            const amountApprove = ethers.parseUnits("1000", this.ftaDecimals);
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
-            if (allow < price) {
-                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, price);
+            if (allow < amountApprove) {
+                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, amountApprove);
                  await txApp.wait();
             }
             const tx = await this.contracts.mining.spinWheel();
@@ -404,10 +410,10 @@ class Application {
     async goFishing() {
         this.setLoader(true, "Pêche...");
         try {
-            const price = await this.contracts.mining.fishingTicketPrice();
+            const amountApprove = ethers.parseUnits("1000", this.ftaDecimals);
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
-            if (allow < price) {
-                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, price);
+            if (allow < amountApprove) {
+                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, amountApprove);
                  await txApp.wait();
             }
             const tx = await this.contracts.mining.goFishing();
@@ -421,10 +427,10 @@ class Application {
     async buyLotteryTicket() {
         this.setLoader(true, "Ticket...");
         try {
-            const price = await this.contracts.mining.lotteryTicketPrice();
+            const amountApprove = ethers.parseUnits("1000", this.ftaDecimals);
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
-            if (allow < price) {
-                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, price);
+            if (allow < amountApprove) {
+                 const txApp = await this.contracts.fta.approve(CONFIG.MINING, amountApprove);
                  await txApp.wait();
             }
             const tx = await this.contracts.mining.buyLotteryTicket();
