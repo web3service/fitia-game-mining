@@ -47,13 +47,13 @@ class Application {
         this.currentRate = 0;
         this.payMode = 'USDT'; 
         this.swapDirection = 'USDT_TO_FTA';
-        this.ftaDecimals = 18; 
+        this.ftaDecimals = 18;
         this.currentRealPower = 0;
         this.pendingBalance = 0;    
         this.miningTimer = null;
         this.storageKey = "fitia_last_claim_time";
         this.shopData = [];
-        this.isRenderingShop = false; // VERROU POUR EMPÊCHER LE CLIGNOTEMENT
+        this.isLoadingShop = false; // VERROU ANTI-CLIGNOTEMENT
         this.vizContext = null;
         this.vizBars = [];
     }
@@ -64,7 +64,7 @@ class Application {
             window.ethereum.on('accountsChanged', () => window.location.reload());
             window.ethereum.on('chainChanged', () => window.location.reload());
         } else {
-            this.showToast("Wallet non détecté", true);
+            this.showToast("Installez MetaMask", true);
         }
     }
 
@@ -77,19 +77,14 @@ class Application {
             this.user = await this.signer.getAddress();
 
             const network = await this.provider.getNetwork();
-            if (Number(network.chainId) !== CONFIG.CHAIN_ID) {
-                await this.switchNetwork();
-            }
+            if (Number(network.chainId) !== CONFIG.CHAIN_ID) await this.switchNetwork();
 
             this.contracts.usdt = new ethers.Contract(CONFIG.USDT, ERC20_ABI, this.signer);
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
             this.contracts.mining = new ethers.Contract(CONFIG.MINING, MINING_ABI, this.signer);
 
-            // Détection décimales
-            try {
-                this.ftaDecimals = await this.contracts.fta.decimals();
-                console.log("FTA Decimals:", this.ftaDecimals);
-            } catch (e) { this.ftaDecimals = 18; }
+            // Détection auto décimales
+            try { this.ftaDecimals = await this.contracts.fta.decimals(); } catch(e) { this.ftaDecimals = 18; }
 
             document.getElementById('btn-connect').classList.add('hidden');
             document.getElementById('wallet-status').classList.remove('hidden');
@@ -98,18 +93,16 @@ class Application {
             await this.updateData();
             setInterval(() => this.updateData(), 5000);
             this.initVisualizer();
-        } catch (e) {
-            this.showToast("Erreur connexion", true);
-        }
+        } catch (e) { this.showToast("Erreur connexion", true); }
         this.setLoader(false);
     }
 
     async switchNetwork() {
         try {
-            await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x' + CONFIG.CHAIN_ID.toString(16) }] });
+            await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
         } catch (e) {
              if (e.code === 4902) {
-                await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x' + CONFIG.CHAIN_ID.toString(16), chainName: 'Polygon Mainnet', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com/'], blockExplorerUrls: ['https://polygonscan.com/'] }] });
+                await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com/'], blockExplorerUrls: ['https://polygonscan.com/'] }] });
             }
         }
     }
@@ -156,20 +149,16 @@ class Application {
             
             const fromBal = this.swapDirection === 'USDT_TO_FTA' ? usdtBal : ftaBal;
             const toBal = this.swapDirection === 'USDT_TO_FTA' ? ftaBal : usdtBal;
-            const fromDec = this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals;
-            const toDec = this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6;
-            document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, fromDec)).toFixed(2);
-            document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, toDec)).toFixed(2);
+            document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
+            document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
 
-            // 4. Shop
+            // 4. Shop (Seulement si vide)
             await this.renderShop();
             
             // 5. Games
             try {
-                const wheelJP = await this.contracts.mining.getWheelJackpot();
-                document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(wheelJP, this.ftaDecimals)).toFixed(2);
-                const lotPool = await this.contracts.mining.getLotteryPool();
-                document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(lotPool, this.ftaDecimals)).toFixed(2);
+                document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getWheelJackpot(), this.ftaDecimals)).toFixed(2);
+                document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getLotteryPool(), this.ftaDecimals)).toFixed(2);
             } catch(e) {}
 
         } catch (e) { console.error("Refresh Error", e); }
@@ -188,7 +177,7 @@ class Application {
     }
     stopMiningCounter() { if (this.miningTimer) { clearInterval(this.miningTimer); this.miningTimer = null; } }
 
-    // --- BOUTIQUE (AVEC VERROU ANTI-CLIGNOTEMENT) ---
+    // --- BOUTIQUE (CORRECTION CLIGNOTEMENT) ---
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
@@ -197,12 +186,10 @@ class Application {
     }
 
     async renderShop(force = false) {
-        // Si on est déjà en train de charger OU qu'on a déjà les données et qu'on ne force pas
-        if (this.isRenderingShop) return;
-        if (this.shopData.length > 0 && !force) return;
+        if (this.isLoadingShop) return; // Verrou actif
+        if (this.shopData.length > 0 && !force) return; // Déjà chargé
 
-        this.isRenderingShop = true; // Activation du verrou
-        
+        this.isLoadingShop = true; // Activation du verrou
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
@@ -226,14 +213,13 @@ class Application {
                     </div>
                     <div>
                         <span class="rig-price">${this.payMode === 'USDT' ? priceUsdt.toFixed(2) + ' $' : priceFta.toFixed(2) + ' FTA'}</span>
-                        <button class="btn-primary" style="padding:8px; margin-top:5px" onclick="App.buyMachine(${i})">ACHETER</button>
+                        <button class="btn-primary" style="padding:10px; font-size:0.8rem" onclick="App.buyMachine(${i})">ACHETER</button>
                     </div>
                 `;
                 container.appendChild(div);
             }
-        } catch(e) { console.error(e); }
-        
-        this.isRenderingShop = false; // Libération du verrou
+        } catch(e) {}
+        this.isLoadingShop = false; // Libération
     }
 
     async buyMachine(id) {
@@ -264,11 +250,9 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
-            this.renderShop(true); // Force refresh boutique
+            this.renderShop(true); // Refresh boutique
             this.updateData();
-        } catch (e) {
-            this.showError(e);
-        }
+        } catch (e) { this.showError(e); }
         this.setLoader(false);
     }
 
@@ -387,7 +371,7 @@ class Application {
         this.setLoader(false);
     }
 
-    // --- NAV & UI ---
+    // --- NAV ---
     nav(viewId) {
         document.querySelectorAll('.view').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
         const activeView = document.getElementById('view-' + viewId);
@@ -454,22 +438,15 @@ class Application {
         show ? l.classList.remove('hidden') : l.classList.add('hidden');
     }
     
-    // --- GESTION PROFESSIONNELLE DES ERREURS ---
     showError(e) {
         console.error(e);
-        let msg = "Une erreur est survenue.";
-        
-        // Extraction du message Ethers.js V6
+        let msg = "Erreur inconnue";
         if(e.reason) msg = e.reason;
         else if (e.error && e.error.reason) msg = e.error.reason;
         else if (e.data && e.data.message) msg = e.data.message;
         
-        // Traduction des messages techniques pour l'utilisateur
-        if(msg.includes("insufficient funds")) msg = "Fonds insuffisants (gas ou tokens)";
-        if(msg.includes("Invalid bet amount")) msg = "Mise invalide (trop élevée ou contrat vide)";
-        if(msg.includes("Insolvent") || msg.includes("Not enough")) msg = "Le contrat n'a pas assez de liquidité";
-        if(msg.includes("execution reverted")) msg = "Transaction annulée par le contrat";
-        if(msg.includes("user rejected")) msg = "Transaction refusée dans le wallet";
+        if(msg.includes("Invalid bet amount")) msg = "Mise invalide ou contrat vide";
+        if(msg.includes("insufficient funds")) msg = "Fonds insuffisants";
         
         this.showToast(msg, true);
     }

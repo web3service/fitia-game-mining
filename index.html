@@ -3,43 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0f172a">
     <title>FITIA PRO MINER</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Ethers.js V6 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 </head>
 <body>
 
-    <!-- Fond Animé -->
-    <div class="bg-gradient"></div>
-    
-    <!-- Notifications -->
+    <div class="bg-glow"></div>
     <div id="toast-container"></div>
 
-    <div class="app-container">
+    <div class="app-shell">
        
-        <!-- Header -->
+        <!-- HEADER -->
         <header>
             <div class="brand">
                 <div class="logo-icon">⚡</div>
                 <div class="brand-text">FITIA <span class="pro-badge">PRO</span></div>
             </div>
-            <button id="btn-connect" class="btn-wallet" onclick="App.connect()">Connecter</button>
+            <button id="btn-connect" class="btn-connect" onclick="App.connect()">Connecter</button>
             <div id="wallet-status" class="wallet-status hidden">
                 <span id="addr-display">0x...</span>
-                <span class="status-dot online"></span>
+                <span class="status-dot"></span>
             </div>
         </header>
 
-        <!-- Contenu Principal -->
+        <!-- MAIN CONTENT -->
         <main id="main-view">
            
-            <!-- 1. DASHBOARD -->
+            <!-- DASHBOARD -->
             <div id="view-dashboard" class="view active">
-               
                 <div class="stats-grid">
-                    <div class="stat-card primary">
+                    <div class="stat-card">
                         <small>PUISSANCE</small>
                         <div class="stat-val" id="val-power">0.00</div>
                         <small>FTA / sec</small>
@@ -51,12 +45,9 @@
                     </div>
                 </div>
 
-                <div class="card visualizer-card">
-                    <div class="viz-header">
-                        <small>MINAGE EN COURS</small>
-                        <span id="viz-status">EN ATTENTE</span>
-                    </div>
+                <div class="visualizer-wrap">
                     <canvas id="mining-canvas"></canvas>
+                    <div class="viz-label" id="viz-status">EN ATTENTE</div>
                 </div>
 
                 <button class="btn-mega" onclick="App.claim()">
@@ -69,14 +60,14 @@
                         <span>💰 USDT</span>
                         <span class="balance" id="bal-usdt">0.00</span>
                     </div>
-                    <div class="row-between" style="margin-top:10px;">
+                    <div class="row-between" style="margin-top:12px;">
                         <span>💎 FTA</span>
                         <span class="balance" id="bal-fta">0.00</span>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. SHOP -->
+            <!-- SHOP -->
             <div id="view-shop" class="view">
                 <div class="shop-header">
                     <h2 class="view-title">⛏️ Boutique</h2>
@@ -88,20 +79,19 @@
                 <div id="shop-list" class="grid-list"></div>
             </div>
 
-            <!-- 3. MES MACHINES -->
+            <!-- MY RIGS -->
             <div id="view-my-rigs" class="view">
                 <h2 class="view-title">⚙️ Mes Machines</h2>
                 <div id="my-rigs-list" class="rigs-list-container"></div>
                 <div id="no-rigs" class="card" style="text-align:center; display:none;">
-                    <p>Vous n'avez pas encore de machines.</p>
+                    <p>Vous n'avez pas encore de machines actives.</p>
                 </div>
             </div>
 
-            <!-- 4. JEUX -->
+            <!-- GAMES -->
             <div id="view-games" class="view">
                 <h2 class="view-title">🎮 Game Center</h2>
                 
-                <!-- Tabs Jeux -->
                 <div class="game-tabs">
                     <button class="game-tab active" onclick="App.showGame('wingo')">Win Go</button>
                     <button class="game-tab" onclick="App.showGame('wheel')">Roue</button>
@@ -140,7 +130,7 @@
                 </div>
             </div>
 
-            <!-- 5. SWAP -->
+            <!-- SWAP -->
             <div id="view-swap" class="view">
                 <h2 class="view-title">💱 Échange</h2>
                 <div class="card swap-interface">
@@ -170,7 +160,7 @@
 
         </main>
 
-        <!-- Navigation -->
+        <!-- NAVIGATION -->
         <nav class="bottom-nav">
             <button class="nav-item active" onclick="App.nav('dashboard')">
                 <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
