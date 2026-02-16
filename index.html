@@ -32,6 +32,21 @@
            
             <!-- DASHBOARD -->
             <div id="view-dashboard" class="view active">
+               
+                <!-- PARRAINAGE -->
+                <div class="card referral-card">
+                    <h3>👥 Système de Parrainage</h3>
+                    <p class="small-text">Gagnez des commissions sur 3 niveaux.</p>
+                    <div class="input-group" onclick="App.copyLink()">
+                        <input type="text" id="ref-link" readonly value="Connectez-vous...">
+                        <button class="icon-btn">📋</button>
+                    </div>
+                    <div id="bind-ref-area" style="display:none; margin-top:15px;">
+                        <p class="small-text">Parrain détecté : <span id="detected-ref" class="highlight"></span></p>
+                        <button class="btn-sm btn-full" onclick="App.bindReferrer()">LIER MON PARRAIN</button>
+                    </div>
+                </div>
+
                 <div class="stats-grid">
                     <div class="stat-card">
                         <small>PUISSANCE</small>

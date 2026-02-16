@@ -55,6 +55,16 @@ main::-webkit-scrollbar { display: none; }
 /* CARDS */
 .card { background: var(--card-bg); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
 
+/* PARRAINAGE */
+.referral-card h3 { margin: 0 0 10px 0; font-size: 1.1rem; }
+.input-group { display: flex; background: rgba(0,0,0,0.3); border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); overflow: hidden; margin-top: 10px; }
+.input-group input { flex: 1; background: transparent; border: none; color: white; padding: 12px 15px; font-size: 0.9rem; cursor: pointer; }
+.icon-btn { background: rgba(255,255,255,0.05); border: none; color: var(--text-muted); padding: 0 15px; cursor: pointer; font-size: 1.2rem; }
+.small-text { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+.highlight { color: var(--accent); font-weight: bold; }
+.btn-sm { padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; margin-top: 5px; }
+.btn-full { width: 100%; background: var(--accent); color: white; }
+
 /* STATS */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
 .stat-card { background: rgba(0,0,0,0.2); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
@@ -117,75 +127,17 @@ main::-webkit-scrollbar { display: none; }
 .btn-game { width: 100%; padding: 20px; background: linear-gradient(45deg, var(--accent), #8b5cf6); border: none; color: white; font-weight: bold; font-size: 1.1rem; border-radius: 12px; cursor: pointer; }
 .jackpot-display { font-size: 2.2rem; font-weight: 800; color: var(--primary); margin-bottom: 20px; font-family: monospace; }
 
-/* SWAP - CORRECTION "CADRÉ DANS LE CADRE" */
+/* SWAP - ALIGNEMENT PRO */
 .swap-interface { padding: 20px; }
-
-/* En-tête aligné avec le contenu */
-.swap-header { 
-    display: flex; justify-content: space-between; 
-    font-size: 0.85rem; color: var(--text-muted); 
-    margin-bottom: 8px; 
-    padding: 0 5px; /* Légère marge pour aligner */
-}
-
-/* Le conteneur principal (Le "Cadre" extérieur) */
-.input-wrap { 
-    position: relative;
-    display: flex; 
-    align-items: center;
-    background: rgba(0,0,0,0.3); 
-    border: 1px solid rgba(255,255,255,0.1); 
-    border-radius: 12px; 
-    padding: 4px; /* Espace autour du bouton interne */
-    margin-bottom: 15px;
-    height: 60px; /* Hauteur fixe pour un rendu propre */
-}
-
-/* Le champ de saisie */
-.input-wrap input { 
-    flex: 1; /* Prend tout l'espace restant */
-    background: transparent; 
-    border: none; 
-    color: var(--text); 
-    font-size: 1.4rem; 
-    padding: 0 15px; 
-    text-align: right; 
-    font-family: monospace;
-    min-width: 0; /* Empêche le dépassement */
-    z-index: 1;
-}
-
-/* Le bouton de devise (Le "Cadre" intérieur) */
-.token-select { 
-    flex-shrink: 0; /* Empêche le bouton de rétrécir */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255,255,255,0.1); 
-    border: 1px solid rgba(255,255,255,0.1); /* Bordure légère pour l'effet "cadre" */
-    padding: 0 18px; 
-    height: 100%; /* Prend toute la hauteur du conteneur */
-    border-radius: 8px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    font-size: 0.95rem;
-    transition: background 0.2s;
-    margin: 0; /* Pas de marge pour coller au bord droit */
-}
-.token-select:active { background: var(--primary); color: black; }
-
-/* Flèche de swap */
-.swap-arrow-wrap { text-align: center; height: 30px; margin: 5px 0; display: flex; justify-content: center; align-items: center; }
-.swap-arrow { 
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 40px; height: 40px;
-    background: var(--bg); border: 1px solid #333;
-    border-radius: 50%; cursor: pointer; 
-    font-size: 1.2rem; color: var(--text-muted);
-    transition: 0.2s;
-}
+.swap-header { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; padding: 0 5px; }
+.input-wrap { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 0 4px 0 0; height: 60px; margin-bottom: 10px; }
+.input-wrap input { flex: 1; height: 100%; background: transparent; border: none; color: var(--text); font-size: 1.4rem; padding: 0 0 0 20px; text-align: left; font-family: 'Courier New', monospace; }
+.input-wrap input::placeholder { color: rgba(255, 255, 255, 0.3); text-align: left; }
+.token-select { flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); padding: 0 18px; height: 42px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; transition: background 0.2s; }
+.token-select:active { background: var(--primary); color: #000; border-color: var(--primary); }
+.swap-arrow-wrap { text-align: center; height: 25px; margin: 5px 0; display: flex; justify-content: center; align-items: center; }
+.swap-arrow { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: var(--bg); border: 1px solid #333; border-radius: 50%; cursor: pointer; font-size: 1.2rem; color: var(--text-muted); transition: 0.2s; }
 .swap-arrow:hover { border-color: var(--primary); color: var(--primary); }
-
 .rate-info { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-top: 15px; }
 
 /* NAV */

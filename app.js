@@ -20,6 +20,7 @@ const MINING_ABI = [
     "function buyMachine(uint256 typeId)",
     "function buyMachineWithFTA(uint256 typeId)",
     "function claimRewards()",
+    "function setReferrer(address)",
     "function swapUsdtForFta(uint256 amount)",
     "function swapFtaForUsdt(uint256 amount)",
     "function playWinGo(uint256 amount, uint8 betType, uint8 choice)",
@@ -47,13 +48,13 @@ class Application {
         this.currentRate = 0;
         this.payMode = 'USDT'; 
         this.swapDirection = 'USDT_TO_FTA';
-        this.ftaDecimals = 18; 
+        this.ftaDecimals = 18;
         this.currentRealPower = 0;
         this.pendingBalance = 0;    
         this.miningTimer = null;
         this.storageKey = "fitia_last_claim_time";
         this.shopData = [];
-        this.isLoadingShop = false; // VERROU ANTI-CLIGNOTEMENT
+        this.isLoadingShop = false; 
         this.vizContext = null;
         this.vizBars = [];
     }
@@ -83,12 +84,15 @@ class Application {
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
             this.contracts.mining = new ethers.Contract(CONFIG.MINING, MINING_ABI, this.signer);
 
-            // Détection auto décimales
             try { this.ftaDecimals = await this.contracts.fta.decimals(); } catch(e) { this.ftaDecimals = 18; }
 
             document.getElementById('btn-connect').classList.add('hidden');
             document.getElementById('wallet-status').classList.remove('hidden');
             document.getElementById('addr-display').innerText = this.user.slice(0,6) + "..." + this.user.slice(38);
+
+            // Parrainage Init
+            this.checkReferral();
+            document.getElementById('ref-link').value = window.location.origin + "?ref=" + this.user;
 
             await this.updateData();
             setInterval(() => this.updateData(), 5000);
@@ -110,7 +114,6 @@ class Application {
     async updateData() {
         if (!this.user) return;
         try {
-            // 1. Minage
             const rawPower = await this.contracts.mining.getActivePower(this.user);
             let multiplier = 1e18;
             try { multiplier = await this.contracts.mining.difficultyMultiplier(); } catch(e) {}
@@ -136,13 +139,11 @@ class Application {
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
             if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 
-            // 2. Balances
             const usdtBal = await this.contracts.usdt.balanceOf(this.user);
             const ftaBal = await this.contracts.fta.balanceOf(this.user);
             document.getElementById('bal-usdt').innerText = parseFloat(ethers.formatUnits(usdtBal, 6)).toFixed(2);
             document.getElementById('bal-fta').innerText = parseFloat(ethers.formatUnits(ftaBal, this.ftaDecimals)).toFixed(2);
 
-            // 3. Swap
             const rate = await this.contracts.mining.exchangeRate();
             this.currentRate = parseFloat(ethers.formatUnits(rate, 8)); 
             document.getElementById('swap-rate').innerText = `1 USDT = ${this.currentRate.toFixed(2)} FTA`;
@@ -152,10 +153,8 @@ class Application {
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
             document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
 
-            // 4. Shop
             await this.renderShop();
             
-            // 5. Games
             try {
                 document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getWheelJackpot(), this.ftaDecimals)).toFixed(2);
                 document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getLotteryPool(), this.ftaDecimals)).toFixed(2);
@@ -177,19 +176,49 @@ class Application {
     }
     stopMiningCounter() { if (this.miningTimer) { clearInterval(this.miningTimer); this.miningTimer = null; } }
 
-    // --- BOUTIQUE (VERROUILLAGE ANTI-BUG) ---
+    // --- PARRAINAGE ---
+    checkReferral() {
+        const params = new URLSearchParams(window.location.search);
+        const ref = params.get('ref');
+        if (ref && ethers.isAddress(ref)) {
+            document.getElementById('bind-ref-area').style.display = 'block';
+            document.getElementById('detected-ref').innerText = ref;
+        }
+    }
+
+    async bindReferrer() {
+        const addr = document.getElementById('detected-ref').innerText;
+        if (!ethers.isAddress(addr)) return;
+        this.setLoader(true, "Liaison...");
+        try {
+            const tx = await this.contracts.mining.setReferrer(addr);
+            await tx.wait();
+            this.showToast("Parrain lié avec succès !");
+            document.getElementById('bind-ref-area').style.display = 'none';
+        } catch(e) { this.showError(e); }
+        this.setLoader(false);
+    }
+
+    copyLink() {
+        const val = document.getElementById('ref-link').value;
+        if (!val || val === "Connectez-vous...") return this.showToast("Connectez-vous d'abord", true);
+        navigator.clipboard.writeText(val);
+        this.showToast("Lien copié !");
+    }
+
+    // --- BOUTIQUE ---
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
         document.getElementById('btn-pay-fta').classList.toggle('active', mode === 'FTA');
-        this.renderShop(true); // Force refresh
+        this.renderShop(true);
     }
 
     async renderShop(force = false) {
-        if (this.isLoadingShop) return; // Verrou actif
-        if (this.shopData.length > 0 && !force) return; // Déjà chargé
+        if (this.isLoadingShop) return;
+        if (this.shopData.length > 0 && !force) return;
 
-        this.isLoadingShop = true; // Activation
+        this.isLoadingShop = true;
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
@@ -219,7 +248,7 @@ class Application {
                 container.appendChild(div);
             }
         } catch(e) {}
-        this.isLoadingShop = false; // Libération
+        this.isLoadingShop = false;
     }
 
     async buyMachine(id) {
@@ -250,7 +279,7 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
-            this.renderShop(true); 
+            this.renderShop(true);
             this.updateData();
         } catch (e) { this.showError(e); }
         this.setLoader(false);
@@ -326,7 +355,7 @@ class Application {
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < amount) await (await this.contracts.fta.approve(CONFIG.MINING, amount)).wait();
             await (await this.contracts.mining.playWinGo(amount, type, choice)).wait();
-            this.showToast("Jeu terminé !");
+            this.showToast("Jeu terminé ! Vérifiez votre solde.");
             this.updateData();
         } catch(e) { this.showError(e); }
         this.setLoader(false);
