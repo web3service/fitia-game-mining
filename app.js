@@ -17,7 +17,6 @@ const MINING_ABI = [
     "function exchangeRate() view returns (uint256)",
     "function getWheelJackpot() view returns (uint256)",
     "function getLotteryPool() view returns (uint256)",
-    "function ftaToken() view returns (address)", // Pour vérifier la liquidité du contrat
     "function buyMachine(uint256 typeId)",
     "function buyMachineWithFTA(uint256 typeId)",
     "function claimRewards()",
@@ -53,7 +52,8 @@ class Application {
         this.pendingBalance = 0;    
         this.miningTimer = null;
         this.storageKey = "fitia_last_claim_time";
-        this.shopData = []; // Cache pour la boutique
+        this.shopData = [];
+        this.isRenderingShop = false; // VERROU POUR EMPÊCHER LE CLIGNOTEMENT
         this.vizContext = null;
         this.vizBars = [];
     }
@@ -71,7 +71,6 @@ class Application {
     async connect() {
         if (!window.ethereum) return;
         this.setLoader(true, "Connexion...");
-       
         try {
             await window.ethereum.request({ method: 'eth_requestAccounts' });
             this.signer = await this.provider.getSigner();
@@ -89,19 +88,17 @@ class Application {
             // Détection décimales
             try {
                 this.ftaDecimals = await this.contracts.fta.decimals();
-                console.log("FTA Decimals détectées:", this.ftaDecimals);
-            } catch (e) { console.warn("Décimales FTA par défaut: 18"); this.ftaDecimals = 18; }
+                console.log("FTA Decimals:", this.ftaDecimals);
+            } catch (e) { this.ftaDecimals = 18; }
 
             document.getElementById('btn-connect').classList.add('hidden');
-            const ws = document.getElementById('wallet-status');
-            ws.classList.remove('hidden');
+            document.getElementById('wallet-status').classList.remove('hidden');
             document.getElementById('addr-display').innerText = this.user.slice(0,6) + "..." + this.user.slice(38);
 
             await this.updateData();
             setInterval(() => this.updateData(), 5000);
             this.initVisualizer();
         } catch (e) {
-            console.error(e);
             this.showToast("Erreur connexion", true);
         }
         this.setLoader(false);
@@ -164,10 +161,10 @@ class Application {
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, fromDec)).toFixed(2);
             document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, toDec)).toFixed(2);
 
-            // 4. Shop (CORRECTION DU CLIGNOTEMENT)
-            if (this.shopData.length === 0) await this.renderShop();
+            // 4. Shop
+            await this.renderShop();
             
-            // 5. Games Data
+            // 5. Games
             try {
                 const wheelJP = await this.contracts.mining.getWheelJackpot();
                 document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(wheelJP, this.ftaDecimals)).toFixed(2);
@@ -191,24 +188,26 @@ class Application {
     }
     stopMiningCounter() { if (this.miningTimer) { clearInterval(this.miningTimer); this.miningTimer = null; } }
 
-    // --- BOUTIQUE ---
+    // --- BOUTIQUE (AVEC VERROU ANTI-CLIGNOTEMENT) ---
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
         document.getElementById('btn-pay-fta').classList.toggle('active', mode === 'FTA');
-        this.renderShop(); // Mise à jour affichage prix
+        this.renderShop(true); // Force refresh
     }
 
-    async renderShop() {
+    async renderShop(force = false) {
+        // Si on est déjà en train de charger OU qu'on a déjà les données et qu'on ne force pas
+        if (this.isRenderingShop) return;
+        if (this.shopData.length > 0 && !force) return;
+
+        this.isRenderingShop = true; // Activation du verrou
+        
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
-            
-            // On ne vide et ne reconstruit que si les données ont changé ou si c'est le premier chargement
-            // Pour simplifier, on garde le remplissage, mais on s'assure que shopData est bien rempli
-            
-            container.innerHTML = ''; // On vide le container HTML
-            this.shopData = []; // On vide le cache (CORRECTION IMPORTANTE)
+            container.innerHTML = ''; 
+            this.shopData = [];
 
             for(let i=0; i<count; i++) {
                 const data = await this.contracts.mining.machineTypes(i);
@@ -216,7 +215,6 @@ class Application {
                 const priceFta = priceUsdt * this.currentRate; 
                 const power = parseFloat(ethers.formatUnits(data.power, 8)); 
 
-                // CORRECTION: On remplit le cache pour éviter le rechargement incessant
                 this.shopData.push({ price: priceUsdt, power: power });
 
                 const div = document.createElement('div');
@@ -234,6 +232,8 @@ class Application {
                 container.appendChild(div);
             }
         } catch(e) { console.error(e); }
+        
+        this.isRenderingShop = false; // Libération du verrou
     }
 
     async buyMachine(id) {
@@ -264,7 +264,7 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
-            this.shopData = []; // Force refresh shop au prochain cycle
+            this.renderShop(true); // Force refresh boutique
             this.updateData();
         } catch (e) {
             this.showError(e);
@@ -342,7 +342,7 @@ class Application {
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < amount) await (await this.contracts.fta.approve(CONFIG.MINING, amount)).wait();
             await (await this.contracts.mining.playWinGo(amount, type, choice)).wait();
-            this.showToast("Jeu terminé !");
+            this.showToast("Jeu terminé ! Vérifiez votre solde.");
             this.updateData();
         } catch(e) { this.showError(e); }
         this.setLoader(false);
@@ -351,7 +351,7 @@ class Application {
     async spinWheel() {
         this.setLoader(true, "Roue...");
         try {
-            const price = ethers.parseUnits("100", this.ftaDecimals); // Approximatif si price change, idéalement fetch
+            const price = ethers.parseUnits("100", this.ftaDecimals); 
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < price) await (await this.contracts.fta.approve(CONFIG.MINING, price)).wait();
             await (await this.contracts.mining.spinWheel()).wait();
@@ -454,19 +454,22 @@ class Application {
         show ? l.classList.remove('hidden') : l.classList.add('hidden');
     }
     
-    // NOUVELLE FONCTION POUR AFFICHER LES VRAIES ERREURS
+    // --- GESTION PROFESSIONNELLE DES ERREURS ---
     showError(e) {
         console.error(e);
-        let msg = "Erreur inconnue";
-        // Ethers.js V6 met souvent l'erreur dans e.reason ou e.data
-        if(e.reason) msg = e.reason;
-        else if (e.data && e.data.message) msg = e.data.message;
-        else if (e.message) msg = e.message;
+        let msg = "Une erreur est survenue.";
         
-        // Messages conviviaux
+        // Extraction du message Ethers.js V6
+        if(e.reason) msg = e.reason;
+        else if (e.error && e.error.reason) msg = e.error.reason;
+        else if (e.data && e.data.message) msg = e.data.message;
+        
+        // Traduction des messages techniques pour l'utilisateur
+        if(msg.includes("insufficient funds")) msg = "Fonds insuffisants (gas ou tokens)";
         if(msg.includes("Invalid bet amount")) msg = "Mise invalide (trop élevée ou contrat vide)";
-        if(msg.includes("Insolvent")) msg = "Le contrat n'a pas assez de fonds";
-        if(msg.includes("insufficient allowance")) msg = "Erreur d'approbation";
+        if(msg.includes("Insolvent") || msg.includes("Not enough")) msg = "Le contrat n'a pas assez de liquidité";
+        if(msg.includes("execution reverted")) msg = "Transaction annulée par le contrat";
+        if(msg.includes("user rejected")) msg = "Transaction refusée dans le wallet";
         
         this.showToast(msg, true);
     }
@@ -477,7 +480,7 @@ class Application {
         if (isError) div.style.borderLeftColor = 'var(--danger)';
         div.innerText = msg;
         document.getElementById('toast-container').appendChild(div);
-        setTimeout(() => div.remove(), 4000); // Un peu plus long pour lire l'erreur
+        setTimeout(() => div.remove(), 4000);
     }
 }
 
