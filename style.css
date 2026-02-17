@@ -16,7 +16,7 @@ body {
     background-color: var(--bg);
     color: var(--text);
     height: 100vh;
-    height: 100dvh; /* Correction mobile */
+    height: 100dvh; /* Mobile Fix */
     overflow: hidden;
     overscroll-behavior: none;
 }
@@ -130,59 +130,14 @@ main::-webkit-scrollbar { display: none; }
 .btn-game { width: 100%; padding: 15px; background: linear-gradient(45deg, var(--accent), #8b5cf6); border: none; color: white; font-weight: bold; font-size: 1rem; border-radius: 12px; cursor: pointer; }
 .jackpot-display { font-size: 1.8rem; font-weight: 800; color: var(--primary); margin-bottom: 15px; font-family: monospace; }
 
-/* SWAP - EXEMPLE PRO (Chiffres Gauche / Devise Droite) */
-
+/* SWAP - EXEMPLE PRO */
 .swap-interface { padding: 15px; }
 .swap-header { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; padding: 0 4px; }
-
-/* Le Cadre */
-.input-wrap { 
-    display: flex; 
-    justify-content: space-between; /* Espace les deux éléments */
-    align-items: center; /* Centre verticalement */
-    background: rgba(0,0,0,0.3); 
-    border: 1px solid rgba(255,255,255,0.1); 
-    border-radius: 12px; 
-    height: 52px; 
-    margin-bottom: 8px;
-    position: relative;
-}
-
-/* Les Chiffres */
-.input-wrap input { 
-    flex: 1;
-    height: 100%;
-    background: transparent; 
-    border: none; 
-    color: var(--text); 
-    font-size: 1.3rem; 
-    padding: 0 0 0 16px; /* Espace à gauche */
-    text-align: left; /* ALIGNÉ À GAUCHE */
-    font-family: 'Courier New', monospace; 
-    font-weight: bold;
-}
-
-/* Placeholder */
+.input-wrap { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; height: 52px; margin-bottom: 8px; }
+.input-wrap input { flex: 1; height: 100%; background: transparent; border: none; color: var(--text); font-size: 1.3rem; padding: 0 0 0 16px; text-align: left; font-family: 'Courier New', monospace; font-weight: bold; }
 .input-wrap input::placeholder { color: rgba(255, 255, 255, 0.3); text-align: left; }
-
-/* Le Bouton Devise */
-.token-select { 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255,255,255,0.1); 
-    border-radius: 10px; 
-    margin: 6px; /* Espace autour du bouton dans le cadre */
-    padding: 0 14px; 
-    height: calc(100% - 12px); /* Prend presque toute la hauteur */
-    font-weight: bold; 
-    cursor: pointer; 
-    font-size: 0.95rem;
-    transition: 0.2s;
-}
+.token-select { display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 10px; margin: 6px; padding: 0 14px; height: calc(100% - 12px); font-weight: bold; cursor: pointer; font-size: 0.95rem; }
 .token-select:active { background: var(--primary); color: #000; }
-
-/* Flèche */
 .swap-arrow-wrap { text-align: center; height: 20px; margin: 4px 0; display: flex; justify-content: center; align-items: center; }
 .swap-arrow { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; background: var(--bg); border: 1px solid #333; border-radius: 50%; cursor: pointer; font-size: 1rem; color: var(--text-muted); }
 .rate-info { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; }

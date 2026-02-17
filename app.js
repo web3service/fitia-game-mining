@@ -2,9 +2,9 @@
 // CONFIGURATION
 // ==========================================
 const CONFIG = {
-    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", // Votre contrat Minage
-    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", // Votre contrat Token FTA
-    USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", // USDT Polygon
+    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", 
+    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", 
+    USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 
     CHAIN_ID: 137
 };
 
@@ -41,22 +41,12 @@ const ERC20_ABI = [
 // ==========================================
 class Application {
     constructor() {
-        this.provider = null;
-        this.signer = null;
-        this.contracts = {};
-        this.user = null;
-        this.currentRate = 0;
-        this.payMode = 'USDT'; 
-        this.swapDirection = 'USDT_TO_FTA';
-        this.ftaDecimals = 18;
-        this.currentRealPower = 0;
-        this.pendingBalance = 0;    
-        this.miningTimer = null;
-        this.storageKey = "fitia_last_claim_time";
-        this.shopData = [];
-        this.isLoadingShop = false; 
-        this.vizContext = null;
-        this.vizBars = [];
+        this.provider = null; this.signer = null; this.contracts = {}; this.user = null;
+        this.currentRate = 0; this.payMode = 'USDT'; this.swapDirection = 'USDT_TO_FTA';
+        this.ftaDecimals = 18; this.currentRealPower = 0; this.pendingBalance = 0;    
+        this.miningTimer = null; this.storageKey = "fitia_last_claim_time";
+        this.shopData = []; this.isLoadingShop = false; 
+        this.vizContext = null; this.vizBars = [];
     }
 
     async init() {
@@ -64,9 +54,7 @@ class Application {
             this.provider = new ethers.BrowserProvider(window.ethereum);
             window.ethereum.on('accountsChanged', () => window.location.reload());
             window.ethereum.on('chainChanged', () => window.location.reload());
-        } else {
-            this.showToast("Installez MetaMask", true);
-        }
+        } else { this.showToast("Installez MetaMask", true); }
     }
 
     async connect() {
@@ -90,34 +78,52 @@ class Application {
             document.getElementById('wallet-status').classList.remove('hidden');
             document.getElementById('addr-display').innerText = this.user.slice(0,6) + "..." + this.user.slice(38);
 
-            // Parrainage Init
             this.checkReferral();
             document.getElementById('ref-link').value = window.location.origin + "?ref=" + this.user;
 
             await this.updateData();
             setInterval(() => this.updateData(), 5000);
             this.initVisualizer();
+            window.addEventListener('resize', () => this.resizeCanvas());
+            
         } catch (e) { this.showToast("Erreur connexion", true); }
         this.setLoader(false);
     }
 
     async switchNetwork() {
-        try {
-            await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
+        try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
         } catch (e) {
              if (e.code === 4902) {
                 await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon', nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 }, rpcUrls: ['https://polygon-rpc.com/'], blockExplorerUrls: ['https://polygonscan.com/'] }] });
             }
         }
     }
+    
+    resizeCanvas() {
+        if(this.vizContext) {
+            const canvas = this.vizContext.canvas;
+            canvas.width = canvas.offsetWidth * 2;
+            canvas.height = canvas.offsetHeight * 2;
+        }
+    }
 
     async updateData() {
         if (!this.user) return;
         try {
+            // 1. Récupération Puissance Brute
             const rawPower = await this.contracts.mining.getActivePower(this.user);
-            let multiplier = 1e18;
-            try { multiplier = await this.contracts.mining.difficultyMultiplier(); } catch(e) {}
+            
+            // 2. Récupération Multiplicateur (Difficulty)
+            let multiplier = 1e18; // Valeur par défaut (vitesse normale)
+            try { 
+                multiplier = await this.contracts.mining.difficultyMultiplier(); 
+                // Debug: console.log("Multiplicateur:", multiplier.toString());
+            } catch(e) { 
+                // Si la fonction n'existe pas, on garde 1e18
+            }
 
+            // 3. Calcul Puissance Réelle
+            // Formule: (raw * mult) / 1e18 / 1e8
             const realPowerBN = (rawPower * multiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
@@ -176,7 +182,6 @@ class Application {
     }
     stopMiningCounter() { if (this.miningTimer) { clearInterval(this.miningTimer); this.miningTimer = null; } }
 
-    // --- PARRAINAGE ---
     checkReferral() {
         const params = new URLSearchParams(window.location.search);
         const ref = params.get('ref');
@@ -206,7 +211,6 @@ class Application {
         this.showToast("Lien copié !");
     }
 
-    // --- BOUTIQUE ---
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
@@ -217,22 +221,18 @@ class Application {
     async renderShop(force = false) {
         if (this.isLoadingShop) return;
         if (this.shopData.length > 0 && !force) return;
-
         this.isLoadingShop = true;
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
             container.innerHTML = ''; 
             this.shopData = [];
-
             for(let i=0; i<count; i++) {
                 const data = await this.contracts.mining.machineTypes(i);
                 const priceUsdt = parseFloat(ethers.formatUnits(data.price, 6));
                 const priceFta = priceUsdt * this.currentRate; 
                 const power = parseFloat(ethers.formatUnits(data.power, 8)); 
-
                 this.shopData.push({ price: priceUsdt, power: power });
-
                 const div = document.createElement('div');
                 div.className = 'rig-item';
                 div.innerHTML = `
@@ -242,7 +242,7 @@ class Application {
                     </div>
                     <div>
                         <span class="rig-price">${this.payMode === 'USDT' ? priceUsdt.toFixed(2) + ' $' : priceFta.toFixed(2) + ' FTA'}</span>
-                        <button class="btn-primary" style="padding:10px; font-size:0.8rem" onclick="App.buyMachine(${i})">ACHETER</button>
+                        <button class="btn-primary" style="padding:8px; font-size:0.8rem" onclick="App.buyMachine(${i})">ACHETER</button>
                     </div>
                 `;
                 container.appendChild(div);
@@ -256,24 +256,15 @@ class Application {
         this.setLoader(true, "Transaction...");
         try {
             const m = await this.contracts.mining.machineTypes(id);
-            
             if (this.payMode === 'USDT') {
                 const allow = await this.contracts.usdt.allowance(this.user, CONFIG.MINING);
-                if (allow < m.price) {
-                    this.setLoader(true, "Approve USDT...");
-                    await (await this.contracts.usdt.approve(CONFIG.MINING, m.price)).wait();
-                }
-                this.setLoader(true, "Achat...");
+                if (allow < m.price) { await (await this.contracts.usdt.approve(CONFIG.MINING, m.price)).wait(); }
                 await (await this.contracts.mining.buyMachine(id)).wait();
             } else {
                 const rate = await this.contracts.mining.exchangeRate();
                 const ftaPrice = (m.price * rate) / 1000000n; 
                 const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
-                if (allow < ftaPrice) {
-                    this.setLoader(true, "Approve FTA...");
-                    await (await this.contracts.fta.approve(CONFIG.MINING, ftaPrice)).wait();
-                }
-                this.setLoader(true, "Achat...");
+                if (allow < ftaPrice) { await (await this.contracts.fta.approve(CONFIG.MINING, ftaPrice)).wait(); }
                 await (await this.contracts.mining.buyMachineWithFTA(id)).wait();
             }
             this.showToast("Achat réussi !");
@@ -285,7 +276,6 @@ class Application {
         this.setLoader(false);
     }
 
-    // --- SWAP ---
     toggleSwap() {
         this.swapDirection = this.swapDirection === 'USDT_TO_FTA' ? 'FTA_TO_USDT' : 'USDT_TO_FTA';
         document.getElementById('token-from-display').innerText = this.swapDirection === 'USDT_TO_FTA' ? 'USDT' : 'FTA';
@@ -308,10 +298,7 @@ class Application {
         try {
             const tokenContract = isUsdtTo ? this.contracts.usdt : this.contracts.fta;
             const allowance = await tokenContract.allowance(this.user, CONFIG.MINING);
-            if (allowance < amount) {
-                this.setLoader(true, "Approve...");
-                await (await tokenContract.approve(CONFIG.MINING, amount)).wait();
-            }
+            if (allowance < amount) { await (await tokenContract.approve(CONFIG.MINING, amount)).wait(); }
             const tx = isUsdtTo ? await this.contracts.mining.swapUsdtForFta(amount) : await this.contracts.mining.swapFtaForUsdt(amount);
             await tx.wait();
             this.showToast("Échange réussi !");
@@ -321,7 +308,6 @@ class Application {
         this.setLoader(false);
     }
 
-    // --- CLAIM ---
     async claim() {
         if (!this.user) return;
         this.stopMiningCounter();
@@ -337,7 +323,6 @@ class Application {
         this.setLoader(false);
     }
 
-    // --- GAMES ---
     showGame(id) {
         document.querySelectorAll('.game-area').forEach(el => el.classList.remove('active'));
         document.getElementById('game-' + id).classList.add('active');
@@ -349,13 +334,12 @@ class Application {
         const betVal = document.getElementById('wingo-bet').value;
         if (!betVal || betVal <= 0) return this.showToast("Mise invalide", true);
         const amount = ethers.parseUnits(betVal, this.ftaDecimals);
-        
         this.setLoader(true, "Jeu...");
         try {
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < amount) await (await this.contracts.fta.approve(CONFIG.MINING, amount)).wait();
             await (await this.contracts.mining.playWinGo(amount, type, choice)).wait();
-            this.showToast("Jeu terminé ! Vérifiez votre solde.");
+            this.showToast("Jeu terminé !");
             this.updateData();
         } catch(e) { this.showError(e); }
         this.setLoader(false);
@@ -400,7 +384,6 @@ class Application {
         this.setLoader(false);
     }
 
-    // --- NAV ---
     nav(viewId) {
         document.querySelectorAll('.view').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
         const activeView = document.getElementById('view-' + viewId);
@@ -433,11 +416,10 @@ class Application {
         } catch(e) {}
     }
     
-    // --- VISUALIZER ---
     initVisualizer() {
         const canvas = document.getElementById('mining-canvas');
         if (!canvas) return;
-        canvas.width = canvas.offsetWidth * 2; canvas.height = canvas.offsetHeight * 2;
+        this.resizeCanvas();
         this.vizContext = canvas.getContext('2d');
         this.vizBars = [];
         for(let i=0; i<20; i++) this.vizBars.push({ height: 0, targetHeight: 0 });
