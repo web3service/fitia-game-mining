@@ -44,10 +44,7 @@ class Application {
         this.provider = null; this.signer = null; this.contracts = {}; this.user = null;
         this.currentRate = 0; this.payMode = 'USDT'; this.swapDirection = 'USDT_TO_FTA';
         this.ftaDecimals = 18;
-        
-        // On stocke le multiplicateur global pour l'utiliser dans la boutique
-        this.currentMultiplier = 1000000000000000000n; // 1e18 par défaut
-        
+        this.currentMultiplier = 1000000000000000000n;
         this.currentRealPower = 0; this.pendingBalance = 0;    
         this.miningTimer = null; this.storageKey = "fitia_last_claim_time";
         this.shopData = []; this.isLoadingShop = false; 
@@ -115,19 +112,13 @@ class Application {
     async updateData() {
         if (!this.user) return;
         try {
-            // 1. Récupération Puissance Brute
             const rawPower = await this.contracts.mining.getActivePower(this.user);
-            
-            // 2. Récupération Multiplicateur (Difficulty) ET STOCKAGE
-            let multiplier = 1e18;
             try { 
-                multiplier = await this.contracts.mining.difficultyMultiplier(); 
-                this.currentMultiplier = multiplier; // ON SAUVEGARDE ICI
+                this.currentMultiplier = await this.contracts.mining.difficultyMultiplier(); 
             } catch(e) { 
                 this.currentMultiplier = 1000000000000000000n; 
             }
 
-            // 3. Calcul Puissance Réelle
             const realPowerBN = (rawPower * this.currentMultiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
@@ -163,7 +154,6 @@ class Application {
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
             document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
 
-            // On force le rafraîchissement de la boutique si le multiplicateur a changé
             await this.renderShop();
             
             try {
@@ -223,7 +213,7 @@ class Application {
         this.renderShop(true);
     }
 
-    // --- BOUTIQUE (CORRECTION ICI) ---
+    // --- BOUTIQUE (OPTIMISÉ) ---
     async renderShop(force = false) {
         if (this.isLoadingShop) return;
         if (this.shopData.length > 0 && !force) return;
@@ -232,17 +222,24 @@ class Application {
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
+            
+            // OPTIMISATION: On prépare toutes les requêtes
+            const promises = [];
+            for(let i=0; i<count; i++) {
+                promises.push(this.contracts.mining.machineTypes(i));
+            }
+            
+            // On envoie tout en même temps (Rapide !)
+            const results = await Promise.all(promises);
+
             container.innerHTML = ''; 
             this.shopData = [];
 
             for(let i=0; i<count; i++) {
-                const data = await this.contracts.mining.machineTypes(i);
+                const data = results[i];
                 const priceUsdt = parseFloat(ethers.formatUnits(data.price, 6));
                 const priceFta = priceUsdt * this.currentRate; 
                 
-                // CALCUL DE LA PUISSANCE RÉELLE (avec difficulté)
-                // data.power est la puissance de base (ex: 50000000 pour 0.5)
-                // On applique le même calcul que pour le dashboard
                 const powerBN = BigInt(data.power.toString());
                 const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
                 const power = parseFloat(ethers.formatUnits(effectivePowerBN, 8)); 
@@ -263,7 +260,7 @@ class Application {
                 `;
                 container.appendChild(div);
             }
-        } catch(e) {}
+        } catch(e) { console.error("Shop Error", e); }
         this.isLoadingShop = false;
     }
 
@@ -286,7 +283,11 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
-            this.renderShop(true);
+            
+            // OPTIMISATION: On force le rafraîchissement immédiat
+            this.isLoadingShop = false; 
+            await this.renderShop(true);
+            await this.checkMyMachines(); // Rafraîchir "Mes Machines" tout de suite
             this.updateData();
         } catch (e) { this.showError(e); }
         this.setLoader(false);
@@ -409,27 +410,44 @@ class Application {
         if (viewId === 'my-rigs') this.checkMyMachines();
     }
 
-    // --- MES MACHINES (CORRECTION ICI) ---
+    // --- MES MACHINES (OPTIMISÉ) ---
     async checkMyMachines() {
         const container = document.getElementById('my-rigs-list');
         const noRigs = document.getElementById('no-rigs');
-        container.innerHTML = '';
+        container.innerHTML = ''; // On vide TOTALEMENT avant de commencer
         if(!this.user) return;
+
+        // Afficher un petit loader le temps du chargement
+        container.innerHTML = '<div class="card" style="text-align:center; padding:10px;"><p>Chargement des machines...</p></div>';
+
         try {
             const count = await this.contracts.mining.getMachineCount();
-            let found = false;
+            
+            // OPTIMISATION: On prépare TOUTES les requêtes en même temps
+            const promises = [];
             for(let i=0; i<count; i++) {
-                const machineCount = await this.contracts.mining.getUserMachineCount(this.user, i);
+                promises.push(this.contracts.mining.getUserMachineCount(this.user, i));
+            }
+            
+            // On attend que TOUT soit arrivé d'un coup
+            const results = await Promise.all(promises);
+
+            // Maintenant on affiche tout instantanément
+            container.innerHTML = ''; // On vide le loader
+            
+            let found = false;
+            
+            for(let i=0; i<count; i++) {
+                const machineCount = results[i];
                 if (machineCount > 0) {
                     found = true;
                     
-                    // Récupération de la puissance de base depuis le cache shopData ou contrat
-                    // On utilise this.shopData qui contient déjà la puissance réelle calculée
                     let powerDisplay = "N/A";
+                    // On utilise les données déjà en cache si dispo
                     if (this.shopData[i]) {
                         powerDisplay = this.shopData[i].power.toFixed(5);
                     } else {
-                        // Fallback si shopData vide
+                        // Calcul à la volée si pas en cache
                         const data = await this.contracts.mining.machineTypes(i);
                         const powerBN = BigInt(data.power.toString());
                         const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
@@ -442,8 +460,18 @@ class Application {
                     container.appendChild(div);
                 }
             }
+            
             noRigs.style.display = found ? 'none' : 'block';
-        } catch(e) {}
+            
+            // Si rien trouvé, on réaffiche le message vide
+            if (!found) {
+                 container.innerHTML = ''; 
+            }
+
+        } catch(e) { 
+            console.error("Erreur chargement machines", e);
+            container.innerHTML = '<div class="card" style="text-align:center; color:red;"><p>Erreur de chargement</p></div>';
+        }
     }
     
     initVisualizer() {
