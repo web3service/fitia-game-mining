@@ -43,7 +43,12 @@ class Application {
     constructor() {
         this.provider = null; this.signer = null; this.contracts = {}; this.user = null;
         this.currentRate = 0; this.payMode = 'USDT'; this.swapDirection = 'USDT_TO_FTA';
-        this.ftaDecimals = 18; this.currentRealPower = 0; this.pendingBalance = 0;    
+        this.ftaDecimals = 18;
+        
+        // On stocke le multiplicateur global pour l'utiliser dans la boutique
+        this.currentMultiplier = 1000000000000000000n; // 1e18 par défaut
+        
+        this.currentRealPower = 0; this.pendingBalance = 0;    
         this.miningTimer = null; this.storageKey = "fitia_last_claim_time";
         this.shopData = []; this.isLoadingShop = false; 
         this.vizContext = null; this.vizBars = [];
@@ -113,17 +118,17 @@ class Application {
             // 1. Récupération Puissance Brute
             const rawPower = await this.contracts.mining.getActivePower(this.user);
             
-            // 2. Récupération Multiplicateur (Difficulty)
-            let multiplier = 1e18; // Valeur par défaut
+            // 2. Récupération Multiplicateur (Difficulty) ET STOCKAGE
+            let multiplier = 1e18;
             try { 
                 multiplier = await this.contracts.mining.difficultyMultiplier(); 
+                this.currentMultiplier = multiplier; // ON SAUVEGARDE ICI
             } catch(e) { 
-                // Fonction inexistante, on garde 1e18
+                this.currentMultiplier = 1000000000000000000n; 
             }
 
             // 3. Calcul Puissance Réelle
-            // Formule corrigée pour gérer les grands nombres correctement
-            const realPowerBN = (rawPower * multiplier) / 1000000000000000000n;
+            const realPowerBN = (rawPower * this.currentMultiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
             let lastClaim = localStorage.getItem(this.storageKey) || Math.floor(Date.now() / 1000);
@@ -141,8 +146,6 @@ class Application {
                 document.getElementById('viz-status').style.color = "#666";
             }
 
-            // --- AFFICHAGE FORMATÉ (0.00050) ---
-            // toFixed(5) sur 0.0005 donne "0.00050"
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
             if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 
@@ -160,6 +163,7 @@ class Application {
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
             document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
 
+            // On force le rafraîchissement de la boutique si le multiplicateur a changé
             await this.renderShop();
             
             try {
@@ -219,21 +223,32 @@ class Application {
         this.renderShop(true);
     }
 
+    // --- BOUTIQUE (CORRECTION ICI) ---
     async renderShop(force = false) {
         if (this.isLoadingShop) return;
         if (this.shopData.length > 0 && !force) return;
+
         this.isLoadingShop = true;
         const container = document.getElementById('shop-list');
         try {
             const count = await this.contracts.mining.getMachineCount();
             container.innerHTML = ''; 
             this.shopData = [];
+
             for(let i=0; i<count; i++) {
                 const data = await this.contracts.mining.machineTypes(i);
                 const priceUsdt = parseFloat(ethers.formatUnits(data.price, 6));
                 const priceFta = priceUsdt * this.currentRate; 
-                const power = parseFloat(ethers.formatUnits(data.power, 8)); 
+                
+                // CALCUL DE LA PUISSANCE RÉELLE (avec difficulté)
+                // data.power est la puissance de base (ex: 50000000 pour 0.5)
+                // On applique le même calcul que pour le dashboard
+                const powerBN = BigInt(data.power.toString());
+                const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
+                const power = parseFloat(ethers.formatUnits(effectivePowerBN, 8)); 
+
                 this.shopData.push({ price: priceUsdt, power: power });
+
                 const div = document.createElement('div');
                 div.className = 'rig-item';
                 div.innerHTML = `
@@ -394,6 +409,7 @@ class Application {
         if (viewId === 'my-rigs') this.checkMyMachines();
     }
 
+    // --- MES MACHINES (CORRECTION ICI) ---
     async checkMyMachines() {
         const container = document.getElementById('my-rigs-list');
         const noRigs = document.getElementById('no-rigs');
@@ -406,10 +422,23 @@ class Application {
                 const machineCount = await this.contracts.mining.getUserMachineCount(this.user, i);
                 if (machineCount > 0) {
                     found = true;
-                    const power = this.shopData[i] ? this.shopData[i].power : "N/A";
+                    
+                    // Récupération de la puissance de base depuis le cache shopData ou contrat
+                    // On utilise this.shopData qui contient déjà la puissance réelle calculée
+                    let powerDisplay = "N/A";
+                    if (this.shopData[i]) {
+                        powerDisplay = this.shopData[i].power.toFixed(5);
+                    } else {
+                        // Fallback si shopData vide
+                        const data = await this.contracts.mining.machineTypes(i);
+                        const powerBN = BigInt(data.power.toString());
+                        const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
+                        powerDisplay = parseFloat(ethers.formatUnits(effectivePowerBN, 8)).toFixed(5);
+                    }
+
                     const div = document.createElement('div');
                     div.className = 'my-rig-card active';
-                    div.innerHTML = `<div class="rig-info"><h4>RIG ${i+1} <span style="opacity:0.7">x${machineCount.toString()}</span></h4><p>${power} FTA/s</p></div><span class="rig-status-badge status-active">ACTIF</span>`;
+                    div.innerHTML = `<div class="rig-info"><h4>RIG ${i+1} <span style="opacity:0.7">x${machineCount.toString()}</span></h4><p>${powerDisplay} FTA/s</p></div><span class="rig-status-badge status-active">ACTIF</span>`;
                     container.appendChild(div);
                 }
             }
