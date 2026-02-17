@@ -74,7 +74,6 @@ class Application {
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
             this.contracts.mining = new ethers.Contract(CONFIG.MINING, MINING_ABI, this.signer);
 
-            // Récupération décimales FTA
             try { this.ftaDecimals = await this.contracts.fta.decimals(); } catch(e) { this.ftaDecimals = 18; }
 
             document.getElementById('btn-connect').classList.add('hidden');
@@ -146,19 +145,17 @@ class Application {
             document.getElementById('bal-usdt').innerText = parseFloat(ethers.formatUnits(usdtBal, 6)).toFixed(2);
             document.getElementById('bal-fta').innerText = parseFloat(ethers.formatUnits(ftaBal, this.ftaDecimals)).toFixed(2);
 
-            // --- CORRECTION TAUX DE CHANGE ---
-            const rateRaw = await this.contracts.mining.exchangeRate();
-            // On utilise les décimales FTA détectées automatiquement
-            this.currentRate = parseFloat(ethers.formatUnits(rateRaw, this.ftaDecimals)); 
-            
+            const rate = await this.contracts.mining.exchangeRate();
+            this.currentRate = parseFloat(ethers.formatUnits(rate, 8)); 
             document.getElementById('swap-rate').innerText = `1 USDT = ${this.currentRate.toFixed(2)} FTA`;
             
             const fromBal = this.swapDirection === 'USDT_TO_FTA' ? usdtBal : ftaBal;
             const toBal = this.swapDirection === 'USDT_TO_FTA' ? ftaBal : usdtBal;
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
-            document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
+            document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2)
 
-            await this.renderShop();
+            // Ici on appelle renderShop SANS forcer le rechargement (on utilise le cache si dispo)
+            await this.renderShop(false);
             
             try {
                 document.getElementById('wheel-jackpot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getWheelJackpot(), this.ftaDecimals)).toFixed(2);
@@ -210,74 +207,80 @@ class Application {
         this.showToast("Lien copié !");
     }
 
+    // --- GESTION BOUTIQUE (CORRIGÉ) ---
+    
+    // Quand on change de mode, on appelle renderShop(false) pour utiliser le cache
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
         document.getElementById('btn-pay-fta').classList.toggle('active', mode === 'FTA');
-        this.renderShop(true);
+        // On ne force PAS le rechargement ici pour que ce soit instantané
+        this.renderShop(false);
     }
 
-    // --- BOUTIQUE (CORRECTION AFFICHAGE FTA) ---
-    async renderShop(force = false) {
+    // forceFetch = true -> Interroge la Blockchain
+    // forceFetch = false -> Utilise les données en mémoire (Rapide)
+    async renderShop(forceFetch = false) {
         if (this.isLoadingShop) return;
-        if (this.shopData.length > 0 && !force) return;
 
-        this.isLoadingShop = true;
         const container = document.getElementById('shop-list');
+        
+        // Si on a les données et qu'on ne force pas le refresh, on affiche direct
+        if (this.shopData.length > 0 && !forceFetch) {
+            this._renderShopHTML(container);
+            return;
+        }
+
+        // Sinon on charge depuis la blockchain
+        this.isLoadingShop = true;
         try {
             const count = await this.contracts.mining.getMachineCount();
-            
             const promises = [];
             for(let i=0; i<count; i++) {
                 promises.push(this.contracts.mining.machineTypes(i));
             }
-            
             const results = await Promise.all(promises);
 
-            container.innerHTML = ''; 
-            this.shopData = [];
+            this.shopData = []; // Reset données
 
             for(let i=0; i<count; i++) {
                 const data = results[i];
                 const priceUsdt = parseFloat(ethers.formatUnits(data.price, 6));
+                const priceFta = priceUsdt * this.currentRate; 
                 
-                // Calcul du prix FTA en utilisant le taux mis à jour dans updateData
-                let priceFta = 0;
-                if (this.currentRate > 0) {
-                    priceFta = priceUsdt * this.currentRate;
-                }
-
                 const powerBN = BigInt(data.power.toString());
                 const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
                 const power = parseFloat(ethers.formatUnits(effectivePowerBN, 8)); 
 
-                this.shopData.push({ price: priceUsdt, power: power });
-
-                // Définition du texte à afficher
-                let displayPrice;
-                if (this.payMode === 'USDT') {
-                    displayPrice = priceUsdt.toFixed(2) + ' $';
-                } else {
-                    // Si le taux est chargé, on affiche le prix, sinon "Chargement..."
-                    displayPrice = (this.currentRate > 0) ? priceFta.toFixed(2) + ' FTA' : 'Chargement...';
-                }
-
-                const div = document.createElement('div');
-                div.className = 'rig-item';
-                div.innerHTML = `
-                    <div>
-                        <span class="rig-name">RIG ${i+1}</span>
-                        <span class="rig-power">${power.toFixed(5)} FTA/s</span>
-                    </div>
-                    <div>
-                        <span class="rig-price">${displayPrice}</span>
-                        <button class="btn-primary" style="padding:8px; font-size:0.8rem" onclick="App.buyMachine(${i})">ACHETER</button>
-                    </div>
-                `;
-                container.appendChild(div);
+                this.shopData.push({ price: priceUsdt, power: power, priceFta: priceFta });
             }
+            
+            // Affichage
+            this._renderShopHTML(container);
+
         } catch(e) { console.error("Shop Error", e); }
         this.isLoadingShop = false;
+    }
+
+    // Fonction interne pour juste mettre à jour l'HTML (Instantané)
+    _renderShopHTML(container) {
+        container.innerHTML = ''; 
+        for(let i=0; i<this.shopData.length; i++) {
+            const data = this.shopData[i];
+            const div = document.createElement('div');
+            div.className = 'rig-item';
+            div.innerHTML = `
+                <div>
+                    <span class="rig-name">RIG ${i+1}</span>
+                    <span class="rig-power">${data.power.toFixed(5)} FTA/s</span>
+                </div>
+                <div>
+                    <span class="rig-price">${this.payMode === 'USDT' ? data.price.toFixed(2) + ' $' : data.priceFta.toFixed(2) + ' FTA'}</span>
+                    <button class="btn-primary" style="padding:8px; font-size:0.8rem" onclick="App.buyMachine(${i})">ACHETER</button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
     }
 
     async buyMachine(id) {
@@ -299,9 +302,11 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
+            
+            // Après achat, on FORCE le refresh des données (forceFetch = true)
             this.isLoadingShop = false; 
             await this.renderShop(true);
-            await this.checkMyMachines();
+            await this.checkMyMachines(); 
             this.updateData();
         } catch (e) { this.showError(e); }
         this.setLoader(false);
@@ -427,23 +432,17 @@ class Application {
     async checkMyMachines() {
         const container = document.getElementById('my-rigs-list');
         const noRigs = document.getElementById('no-rigs');
-        container.innerHTML = ''; 
+        container.innerHTML = '';
         if(!this.user) return;
-
-        container.innerHTML = '<div class="card" style="text-align:center; padding:10px;"><p>Chargement...</p></div>';
 
         try {
             const count = await this.contracts.mining.getMachineCount();
-            
             const promises = [];
             for(let i=0; i<count; i++) {
                 promises.push(this.contracts.mining.getUserMachineCount(this.user, i));
             }
-            
             const results = await Promise.all(promises);
 
-            container.innerHTML = ''; 
-            
             let found = false;
             
             for(let i=0; i<count; i++) {
@@ -454,11 +453,6 @@ class Application {
                     let powerDisplay = "N/A";
                     if (this.shopData[i]) {
                         powerDisplay = this.shopData[i].power.toFixed(5);
-                    } else {
-                        const data = await this.contracts.mining.machineTypes(i);
-                        const powerBN = BigInt(data.power.toString());
-                        const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
-                        powerDisplay = parseFloat(ethers.formatUnits(effectivePowerBN, 8)).toFixed(5);
                     }
 
                     const div = document.createElement('div');
@@ -469,14 +463,9 @@ class Application {
             }
             
             noRigs.style.display = found ? 'none' : 'block';
-            
-            if (!found) {
-                 container.innerHTML = ''; 
-            }
 
         } catch(e) { 
             console.error("Erreur chargement machines", e);
-            container.innerHTML = '<div class="card" style="text-align:center; color:red;"><p>Erreur de chargement</p></div>';
         }
     }
     
