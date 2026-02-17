@@ -114,16 +114,15 @@ class Application {
             const rawPower = await this.contracts.mining.getActivePower(this.user);
             
             // 2. Récupération Multiplicateur (Difficulty)
-            let multiplier = 1e18; // Valeur par défaut (vitesse normale)
+            let multiplier = 1e18; // Valeur par défaut
             try { 
                 multiplier = await this.contracts.mining.difficultyMultiplier(); 
-                // Debug: console.log("Multiplicateur:", multiplier.toString());
             } catch(e) { 
-                // Si la fonction n'existe pas, on garde 1e18
+                // Fonction inexistante, on garde 1e18
             }
 
             // 3. Calcul Puissance Réelle
-            // Formule: (raw * mult) / 1e18 / 1e8
+            // Formule corrigée pour gérer les grands nombres correctement
             const realPowerBN = (rawPower * multiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
@@ -142,6 +141,8 @@ class Application {
                 document.getElementById('viz-status').style.color = "#666";
             }
 
+            // --- AFFICHAGE FORMATÉ (0.00050) ---
+            // toFixed(5) sur 0.0005 donne "0.00050"
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
             if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 

@@ -16,7 +16,7 @@ body {
     background-color: var(--bg);
     color: var(--text);
     height: 100vh;
-    height: 100dvh; /* Mobile Fix */
+    height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
 }
@@ -130,7 +130,7 @@ main::-webkit-scrollbar { display: none; }
 .btn-game { width: 100%; padding: 15px; background: linear-gradient(45deg, var(--accent), #8b5cf6); border: none; color: white; font-weight: bold; font-size: 1rem; border-radius: 12px; cursor: pointer; }
 .jackpot-display { font-size: 1.8rem; font-weight: 800; color: var(--primary); margin-bottom: 15px; font-family: monospace; }
 
-/* SWAP - EXEMPLE PRO */
+/* SWAP */
 .swap-interface { padding: 15px; }
 .swap-header { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; padding: 0 4px; }
 .input-wrap { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; height: 52px; margin-bottom: 8px; }
