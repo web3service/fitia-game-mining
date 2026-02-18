@@ -2,11 +2,11 @@
 // CONFIGURATION
 // ==========================================
 const CONFIG = {
-    // ⚠️ IMPORTANT : REMPLACEZ CES POINTS PAR VOS VRAIES ADRESSES
-    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", // Mettez l'adresse de votre contrat Minage
-    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", // Mettez l'adresse de votre Token FTA
+    // VÉRIFIEZ BIEN CES ADRESSES (40 caractères après 0x)
+    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", 
+    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", 
     USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 
-    CHAIN_ID: 137
+    CHAIN_ID: 137 // 137 = Polygon Mainnet
 };
 
 const MINING_ABI = [
@@ -38,7 +38,7 @@ const ERC20_ABI = [
 ];
 
 // ==========================================
-// LOGIQUE
+// LOGIQUE AVEC DEBUG
 // ==========================================
 class Application {
     constructor() {
@@ -67,19 +67,26 @@ class Application {
             this.signer = await this.provider.getSigner();
             this.user = await this.signer.getAddress();
 
-            // Vérification du réseau
+            // 1. Vérification Réseau
             const network = await this.provider.getNetwork();
-            if (Number(network.chainId) !== CONFIG.CHAIN_ID) await this.switchNetwork();
+            if (Number(network.chainId) !== CONFIG.CHAIN_ID) {
+                this.showToast("Mauvais réseau ! Sélectionnez Polygon", true);
+                await this.switchNetwork();
+            }
 
-            // Initialisation des contrats
+            // 2. Vérification Adresses
+            if (!ethers.isAddress(CONFIG.MINING) || !ethers.isAddress(CONFIG.FTA)) {
+                 this.showToast("ERREUR: Adresse Contrat Invalide dans le code JS", true);
+                 this.setLoader(false);
+                 return;
+            }
+
             this.contracts.usdt = new ethers.Contract(CONFIG.USDT, ERC20_ABI, this.signer);
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
             this.contracts.mining = new ethers.Contract(CONFIG.MINING, MINING_ABI, this.signer);
 
-            // Détection des décimales
             try { this.ftaDecimals = await this.contracts.fta.decimals(); } catch(e) { this.ftaDecimals = 18; }
 
-            // Mise à jour UI
             document.getElementById('btn-connect').classList.add('hidden');
             document.getElementById('wallet-status').classList.remove('hidden');
             document.getElementById('addr-display').innerText = this.user.slice(0,6) + "..." + this.user.slice(38);
@@ -87,15 +94,16 @@ class Application {
             this.checkReferral();
             document.getElementById('ref-link').value = window.location.origin + "?ref=" + this.user;
 
-            // Premier chargement des données
-            await this.updateData(); 
-            setInterval(() => this.updateData(), 5000);
+            // Premier refresh avec gestion d'erreur détaillée
+            await this.updateData(true); 
+            
+            setInterval(() => this.updateData(false), 5000);
             this.initVisualizer();
             window.addEventListener('resize', () => this.resizeCanvas());
             
         } catch (e) { 
             console.error(e); 
-            this.showToast("Erreur connexion: " + (e.reason || e.message), true); 
+            this.showError(e); 
         }
         this.setLoader(false);
     }
@@ -117,27 +125,22 @@ class Application {
         }
     }
 
-    async updateData() {
+    // Ajout du paramètre 'showErrorToUser' pour décider d'afficher ou non l'erreur
+    async updateData(showErrorToUser = false) {
         if (!this.user) return;
         try {
-            // 1. Récupération Puissance Brute
+            // TENTATIVE DE LECTURE
             const rawPower = await this.contracts.mining.getActivePower(this.user);
             
-            // 2. Récupération Multiplicateur (Difficulty)
-            // Si la fonction n'existe pas sur le contrat, on utilise 1e18 par défaut
             try { 
                 this.currentMultiplier = await this.contracts.mining.difficultyMultiplier(); 
             } catch(e) { 
                 this.currentMultiplier = 1000000000000000000n; 
             }
 
-            // 3. Calcul Puissance Réelle
-            // Formule: (raw * mult) / 1e18
-            // Cela suppose que votre contrat stocke la puissance avec une précision fixe (ex: 8 décimales)
             const realPowerBN = (rawPower * this.currentMultiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
-            // 4. Gestion du temps et affichage
             let lastClaim = localStorage.getItem(this.storageKey) || Math.floor(Date.now() / 1000);
             const timePassed = Math.floor(Date.now() / 1000) - parseInt(lastClaim);
             
@@ -156,13 +159,11 @@ class Application {
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
             if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 
-            // 5. Balances
             const usdtBal = await this.contracts.usdt.balanceOf(this.user);
             const ftaBal = await this.contracts.fta.balanceOf(this.user);
             document.getElementById('bal-usdt').innerText = parseFloat(ethers.formatUnits(usdtBal, 6)).toFixed(2);
             document.getElementById('bal-fta').innerText = parseFloat(ethers.formatUnits(ftaBal, this.ftaDecimals)).toFixed(2);
 
-            // 6. Swap Rate
             const rate = await this.contracts.mining.exchangeRate();
             this.currentRate = parseFloat(ethers.formatUnits(rate, 8)); 
             document.getElementById('swap-rate').innerText = `1 USDT = ${this.currentRate.toFixed(2)} FTA`;
@@ -180,8 +181,21 @@ class Application {
             } catch(e) {}
 
         } catch (e) { 
-            console.error("Erreur updateData", e); 
-            // Si erreur ici, c'est souvent que les adresses sont fausses
+            console.error("Erreur Critique updateData", e);
+            // SI c'est le premier chargement, on affiche l'erreur à l'écran
+            if (showErrorToUser) {
+                let msg = "Erreur Contrat: ";
+                if (e.reason) msg += e.reason;
+                else if (e.message) msg += e.message.substring(0, 50);
+                else msg += "Inconnu";
+                
+                // Erreurs courantes traduites
+                if (msg.includes("could not decode result data")) msg = "Erreur: Le contrat ne répond pas. Vérifiez l'adresse du contrat et le réseau (Polygon).";
+                if (msg.includes("call revert")) msg = "Le contrat a rejeté l'appel (Adresse incorrecte ?).";
+                if (msg.includes("network changed")) msg = "Le réseau a changé. Rechargez la page.";
+                
+                this.showToast(msg, true);
+            }
         }
     }
 
@@ -234,11 +248,11 @@ class Application {
         this.renderShop(false);
     }
 
-    async renderShop(forceFetch = false) {
+    async renderShop(force = false) {
         if (this.isLoadingShop) return;
         const container = document.getElementById('shop-list');
         
-        if (this.shopData.length > 0 && !forceFetch) {
+        if (this.shopData.length > 0 && !force) {
             this._renderShopHTML(container);
             return;
         }
@@ -510,7 +524,7 @@ class Application {
         if (isError) div.style.borderLeftColor = 'var(--danger)';
         div.innerText = msg;
         document.getElementById('toast-container').appendChild(div);
-        setTimeout(() => div.remove(), 4000);
+        setTimeout(() => div.remove(), 5000); // 5 secondes pour lire
     }
 }
 
