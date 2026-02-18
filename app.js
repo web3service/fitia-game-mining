@@ -2,8 +2,9 @@
 // CONFIGURATION
 // ==========================================
 const CONFIG = {
-    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", 
-    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", 
+    // ⚠️ IMPORTANT : REMPLACEZ CES POINTS PAR VOS VRAIES ADRESSES
+    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", // Mettez l'adresse de votre contrat Minage
+    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", // Mettez l'adresse de votre Token FTA
     USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 
     CHAIN_ID: 137
 };
@@ -43,8 +44,7 @@ class Application {
     constructor() {
         this.provider = null; this.signer = null; this.contracts = {}; this.user = null;
         this.currentRate = 0; this.payMode = 'USDT'; this.swapDirection = 'USDT_TO_FTA';
-        this.ftaDecimals = 18;
-        this.currentMultiplier = 1000000000000000000n;
+        this.ftaDecimals = 18; this.currentMultiplier = 1000000000000000000n;
         this.currentRealPower = 0; this.pendingBalance = 0;    
         this.miningTimer = null; this.storageKey = "fitia_last_claim_time";
         this.shopData = []; this.isLoadingShop = false; 
@@ -67,15 +67,19 @@ class Application {
             this.signer = await this.provider.getSigner();
             this.user = await this.signer.getAddress();
 
+            // Vérification du réseau
             const network = await this.provider.getNetwork();
             if (Number(network.chainId) !== CONFIG.CHAIN_ID) await this.switchNetwork();
 
+            // Initialisation des contrats
             this.contracts.usdt = new ethers.Contract(CONFIG.USDT, ERC20_ABI, this.signer);
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
             this.contracts.mining = new ethers.Contract(CONFIG.MINING, MINING_ABI, this.signer);
 
+            // Détection des décimales
             try { this.ftaDecimals = await this.contracts.fta.decimals(); } catch(e) { this.ftaDecimals = 18; }
 
+            // Mise à jour UI
             document.getElementById('btn-connect').classList.add('hidden');
             document.getElementById('wallet-status').classList.remove('hidden');
             document.getElementById('addr-display').innerText = this.user.slice(0,6) + "..." + this.user.slice(38);
@@ -83,12 +87,16 @@ class Application {
             this.checkReferral();
             document.getElementById('ref-link').value = window.location.origin + "?ref=" + this.user;
 
-            await this.updateData();
+            // Premier chargement des données
+            await this.updateData(); 
             setInterval(() => this.updateData(), 5000);
             this.initVisualizer();
             window.addEventListener('resize', () => this.resizeCanvas());
             
-        } catch (e) { this.showToast("Erreur connexion", true); }
+        } catch (e) { 
+            console.error(e); 
+            this.showToast("Erreur connexion: " + (e.reason || e.message), true); 
+        }
         this.setLoader(false);
     }
 
@@ -112,16 +120,24 @@ class Application {
     async updateData() {
         if (!this.user) return;
         try {
+            // 1. Récupération Puissance Brute
             const rawPower = await this.contracts.mining.getActivePower(this.user);
+            
+            // 2. Récupération Multiplicateur (Difficulty)
+            // Si la fonction n'existe pas sur le contrat, on utilise 1e18 par défaut
             try { 
                 this.currentMultiplier = await this.contracts.mining.difficultyMultiplier(); 
             } catch(e) { 
                 this.currentMultiplier = 1000000000000000000n; 
             }
 
+            // 3. Calcul Puissance Réelle
+            // Formule: (raw * mult) / 1e18
+            // Cela suppose que votre contrat stocke la puissance avec une précision fixe (ex: 8 décimales)
             const realPowerBN = (rawPower * this.currentMultiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
+            // 4. Gestion du temps et affichage
             let lastClaim = localStorage.getItem(this.storageKey) || Math.floor(Date.now() / 1000);
             const timePassed = Math.floor(Date.now() / 1000) - parseInt(lastClaim);
             
@@ -140,11 +156,13 @@ class Application {
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
             if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 
+            // 5. Balances
             const usdtBal = await this.contracts.usdt.balanceOf(this.user);
             const ftaBal = await this.contracts.fta.balanceOf(this.user);
             document.getElementById('bal-usdt').innerText = parseFloat(ethers.formatUnits(usdtBal, 6)).toFixed(2);
             document.getElementById('bal-fta').innerText = parseFloat(ethers.formatUnits(ftaBal, this.ftaDecimals)).toFixed(2);
 
+            // 6. Swap Rate
             const rate = await this.contracts.mining.exchangeRate();
             this.currentRate = parseFloat(ethers.formatUnits(rate, 8)); 
             document.getElementById('swap-rate').innerText = `1 USDT = ${this.currentRate.toFixed(2)} FTA`;
@@ -154,7 +172,6 @@ class Application {
             document.getElementById('swap-bal-from').innerText = parseFloat(ethers.formatUnits(fromBal, this.swapDirection === 'USDT_TO_FTA' ? 6 : this.ftaDecimals)).toFixed(2);
             document.getElementById('swap-bal-to').innerText = parseFloat(ethers.formatUnits(toBal, this.swapDirection === 'USDT_TO_FTA' ? this.ftaDecimals : 6)).toFixed(2);
 
-            // Ici on appelle renderShop SANS forcer le rechargement (on utilise le cache si dispo)
             await this.renderShop(false);
             
             try {
@@ -162,7 +179,10 @@ class Application {
                 document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getLotteryPool(), this.ftaDecimals)).toFixed(2);
             } catch(e) {}
 
-        } catch (e) { console.error("Refresh Error", e); }
+        } catch (e) { 
+            console.error("Erreur updateData", e); 
+            // Si erreur ici, c'est souvent que les adresses sont fausses
+        }
     }
 
     startMiningCounter() {
@@ -207,62 +227,45 @@ class Application {
         this.showToast("Lien copié !");
     }
 
-    // --- GESTION BOUTIQUE (CORRIGÉ) ---
-    
-    // Quand on change de mode, on appelle renderShop(false) pour utiliser le cache
     setPayMode(mode) {
         this.payMode = mode;
         document.getElementById('btn-pay-usdt').classList.toggle('active', mode === 'USDT');
         document.getElementById('btn-pay-fta').classList.toggle('active', mode === 'FTA');
-        // On ne force PAS le rechargement ici pour que ce soit instantané
         this.renderShop(false);
     }
 
-    // forceFetch = true -> Interroge la Blockchain
-    // forceFetch = false -> Utilise les données en mémoire (Rapide)
     async renderShop(forceFetch = false) {
         if (this.isLoadingShop) return;
-
         const container = document.getElementById('shop-list');
         
-        // Si on a les données et qu'on ne force pas le refresh, on affiche direct
         if (this.shopData.length > 0 && !forceFetch) {
             this._renderShopHTML(container);
             return;
         }
 
-        // Sinon on charge depuis la blockchain
         this.isLoadingShop = true;
         try {
             const count = await this.contracts.mining.getMachineCount();
             const promises = [];
-            for(let i=0; i<count; i++) {
-                promises.push(this.contracts.mining.machineTypes(i));
-            }
+            for(let i=0; i<count; i++) promises.push(this.contracts.mining.machineTypes(i));
             const results = await Promise.all(promises);
 
-            this.shopData = []; // Reset données
-
+            this.shopData = [];
             for(let i=0; i<count; i++) {
                 const data = results[i];
                 const priceUsdt = parseFloat(ethers.formatUnits(data.price, 6));
                 const priceFta = priceUsdt * this.currentRate; 
-                
                 const powerBN = BigInt(data.power.toString());
                 const effectivePowerBN = (powerBN * this.currentMultiplier) / 1000000000000000000n;
                 const power = parseFloat(ethers.formatUnits(effectivePowerBN, 8)); 
 
                 this.shopData.push({ price: priceUsdt, power: power, priceFta: priceFta });
             }
-            
-            // Affichage
             this._renderShopHTML(container);
-
         } catch(e) { console.error("Shop Error", e); }
         this.isLoadingShop = false;
     }
 
-    // Fonction interne pour juste mettre à jour l'HTML (Instantané)
     _renderShopHTML(container) {
         container.innerHTML = ''; 
         for(let i=0; i<this.shopData.length; i++) {
@@ -302,8 +305,6 @@ class Application {
             this.showToast("Achat réussi !");
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
             this.pendingBalance = 0;
-            
-            // Après achat, on FORCE le refresh des données (forceFetch = true)
             this.isLoadingShop = false; 
             await this.renderShop(true);
             await this.checkMyMachines(); 
@@ -438,35 +439,25 @@ class Application {
         try {
             const count = await this.contracts.mining.getMachineCount();
             const promises = [];
-            for(let i=0; i<count; i++) {
-                promises.push(this.contracts.mining.getUserMachineCount(this.user, i));
-            }
+            for(let i=0; i<count; i++) promises.push(this.contracts.mining.getUserMachineCount(this.user, i));
             const results = await Promise.all(promises);
-
+            container.innerHTML = '';
             let found = false;
             
             for(let i=0; i<count; i++) {
                 const machineCount = results[i];
                 if (machineCount > 0) {
                     found = true;
-                    
                     let powerDisplay = "N/A";
-                    if (this.shopData[i]) {
-                        powerDisplay = this.shopData[i].power.toFixed(5);
-                    }
-
+                    if (this.shopData[i]) powerDisplay = this.shopData[i].power.toFixed(5);
                     const div = document.createElement('div');
                     div.className = 'my-rig-card active';
                     div.innerHTML = `<div class="rig-info"><h4>RIG ${i+1} <span style="opacity:0.7">x${machineCount.toString()}</span></h4><p>${powerDisplay} FTA/s</p></div><span class="rig-status-badge status-active">ACTIF</span>`;
                     container.appendChild(div);
                 }
             }
-            
             noRigs.style.display = found ? 'none' : 'block';
-
-        } catch(e) { 
-            console.error("Erreur chargement machines", e);
-        }
+        } catch(e) { console.error("Erreur chargement machines", e); }
     }
     
     initVisualizer() {
@@ -508,10 +499,8 @@ class Application {
         if(e.reason) msg = e.reason;
         else if (e.error && e.error.reason) msg = e.error.reason;
         else if (e.data && e.data.message) msg = e.data.message;
-        
         if(msg.includes("Invalid bet amount")) msg = "Mise invalide ou contrat vide";
         if(msg.includes("insufficient funds")) msg = "Fonds insuffisants";
-        
         this.showToast(msg, true);
     }
 
