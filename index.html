@@ -4,445 +4,211 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#000000">
-    <title>FITIA PRO | New Era</title>
+    <meta name="theme-color" content="#0f172a">
+    <title>FITIA PRO MINER</title>
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
-    <style>
-        /* --- DESIGN SYSTEM --- */
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap');
-        
-        :root {
-            --bg-body: #050505;
-            --glass-bg: rgba(255, 255, 255, 0.03);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --primary: #00ff9d;
-            --accent: #5d5dff;
-            --text-main: #ffffff;
-            --text-muted: #8b8b8b;
-            --gradient-main: linear-gradient(135deg, #00ff9d 0%, #5d5dff 100%);
-        }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body {
-            font-family: 'Outfit', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            margin: 0;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
-
-        .neon-bg {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1;
-            background: 
-                radial-gradient(circle at 10% 20%, rgba(0, 255, 157, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(93, 93, 255, 0.05) 0%, transparent 40%);
-        }
-
-        .app-container { max-width: 480px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 100px; }
-
-        /* HEADER */
-        header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 20px; position: sticky; top: 0; z-index: 100;
-            background: rgba(5, 5, 5, 0.8); backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--glass-border);
-        }
-        .brand { display: flex; align-items: center; gap: 10px; }
-        .logo { font-size: 1.5rem; font-weight: 800; background: var(--gradient-main); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .status-dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; box-shadow: 0 0 10px var(--primary); }
-        
-        /* BOUTONS */
-        .btn-glass {
-            background: var(--glass-bg); border: 1px solid var(--glass-border);
-            color: var(--text-main); padding: 10px 20px; border-radius: 12px;
-            font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 0.9rem;
-        }
-        .btn-glass:hover { background: rgba(255,255,255,0.1); }
-        .btn-glass:active { transform: scale(0.98); }
-        .btn-neon {
-            background: var(--gradient-main); color: #000; border: none;
-            padding: 15px; border-radius: 16px; font-weight: 800;
-            font-size: 1.1rem; cursor: pointer; width: 100%;
-            box-shadow: 0 10px 30px rgba(0, 255, 157, 0.3); transition: 0.3s;
-        }
-        .btn-neon:active { transform: scale(0.98); }
-
-        /* CARDS */
-        .card {
-            background: var(--glass-bg); backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border); border-radius: 24px;
-            padding: 20px; margin: 15px 20px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-        }
-
-        /* INPUTS */
-        .input-neon {
-            width: 100%; background: rgba(0,0,0,0.3);
-            border: 1px solid var(--glass-border); padding: 12px;
-            border-radius: 12px; color: white; font-size: 0.9rem;
-            outline: none; margin-bottom: 10px; font-family: 'Outfit', sans-serif;
-        }
-        .input-neon:focus { border-color: var(--primary); }
-
-        /* STATS GRID */
-        .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .stat-box { text-align: center; position: relative; }
-        .stat-val {
-            font-size: 2rem; font-weight: 800;
-            background: var(--gradient-main); -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent; line-height: 1.2;
-        }
-        .stat-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-
-        /* NAVIGATION FLOTTANTE */
-        .float-nav {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border); border-radius: 30px;
-            padding: 8px 10px; display: flex; gap: 5px; z-index: 1000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .nav-btn {
-            background: transparent; border: none; color: var(--text-muted);
-            padding: 10px 15px; border-radius: 25px; cursor: pointer;
-            transition: 0.2s; display: flex; flex-direction: column;
-            align-items: center; font-size: 0.65rem; font-weight: 600;
-        }
-        .nav-btn svg { width: 22px; height: 22px; margin-bottom: 4px; fill: currentColor; }
-        .nav-btn.active { background: rgba(255, 255, 255, 0.1); color: var(--primary); }
-
-        /* CONTENT SECTIONS */
-        .section { display: none; animation: slideUp 0.4s ease; }
-        .section.active { display: block; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* SHOP GRID */
-        .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .shop-item {
-            background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border);
-            border-radius: 20px; padding: 15px; text-align: center;
-            transition: 0.3s;
-        }
-        .shop-item:hover { border-color: var(--primary); }
-
-        /* LOADER & TOAST */
-        #loader { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 2000; flex-direction: column; }
-        .spinner { width: 50px; height: 50px; border: 3px solid transparent; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 90%; pointer-events: none; }
-        .toast { background: #1a1a1a; border: 1px solid var(--glass-border); padding: 15px; border-radius: 12px; margin-bottom: 10px; text-align: center; color: white; }
-        
-        /* UTILITIES */
-        .hidden { display: none !important; }
-        .text-gradient { background: var(--gradient-main); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        
-        /* Referral Specific Styles */
-        .ref-input-group { display: flex; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid var(--glass-border); overflow: hidden; }
-        .ref-input-group input { border: none; background: transparent; color: white; padding: 12px; flex: 1; font-size: 0.8rem; outline: none; font-family: 'Outfit', sans-serif; }
-        .icon-btn { background: var(--glass-bg); border: none; color: var(--text-muted); padding: 0 15px; cursor: pointer; font-size: 1.1rem; }
-        .highlight { color: var(--accent); font-weight: bold; }
-    </style>
 </head>
 <body>
 
-    <div class="neon-bg"></div>
-    
-    <div id="loader" class="hidden">
-        <div class="spinner"></div>
-        <p id="loader-text" style="margin-top: 20px; color: var(--primary);">Connexion...</p>
-    </div>
-
+    <div class="bg-glow"></div>
     <div id="toast-container"></div>
 
-    <div class="app-container">
-        
+    <div class="app-shell">
+       
         <!-- HEADER -->
         <header>
             <div class="brand">
-                <div style="width:35px; height:35px; background:var(--gradient-main); border-radius:10px; display:flex; align-items:center; justify-content:center; color:black; font-weight:bold;">F</div>
-                <span class="logo">FITIA PRO</span>
+                <div class="logo-icon">⚡</div>
+                <div class="brand-text">FITIA <span class="pro-badge">PRO</span></div>
             </div>
-            <button id="btn-connect" class="btn-glass" onclick="App.connect()">Login</button>
-            <div id="wallet-status" class="hidden flex-between" style="gap:10px;">
-                <span id="addr-display" style="color:var(--primary); font-size:0.9rem;">0x...</span>
-                <div class="status-dot"></div>
+            <button id="btn-connect" class="btn-connect" onclick="App.connect()">Connecter</button>
+            <div id="wallet-status" class="wallet-status hidden">
+                <span id="addr-display">0x...</span>
+                <span class="status-dot"></span>
             </div>
         </header>
 
-        <main>
-            
+        <!-- MAIN CONTENT -->
+        <main id="main-view">
+           
             <!-- DASHBOARD -->
-            <section id="view-dashboard" class="section active">
-                
+            <div id="view-dashboard" class="view active">
+               
                 <!-- PARRAINAGE -->
-                <div class="card">
-                    <h3 style="margin:0 0 5px 0; font-size:1rem;">👥 Système de Parrainage</h3>
-                    <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 15px 0;">Gagnez des commissions sur 3 niveaux.</p>
-                    <div class="ref-input-group" onclick="App.copyLink()">
+                <div class="card referral-card">
+                    <h3>👥 Système de Parrainage</h3>
+                    <p class="small-text">Gagnez des commissions sur 3 niveaux.</p>
+                    <div class="input-group" onclick="App.copyLink()">
                         <input type="text" id="ref-link" readonly value="Connectez-vous...">
                         <button class="icon-btn">📋</button>
                     </div>
-                    <div id="bind-ref-area" style="display:none; margin-top:15px; text-align:center;">
-                        <p style="font-size:0.8rem; color:var(--text-muted);">Parrain détecté : <span id="detected-ref" class="highlight"></span></p>
-                        <button class="btn-glass" style="margin-top:10px; width:100%;" onclick="App.bindReferrer()">LIER MON PARRAIN</button>
+                    <div id="bind-ref-area" style="display:none; margin-top:15px;">
+                        <p class="small-text">Parrain détecté : <span id="detected-ref" class="highlight"></span></p>
+                        <button class="btn-sm btn-full" onclick="App.bindReferrer()">LIER MON PARRAIN</button>
                     </div>
                 </div>
 
-                <!-- STATS & MINING -->
-                <div class="card">
-                    <div class="flex-between" style="margin-bottom: 15px;">
-                        <span style="color:var(--text-muted); font-size:0.9rem;">Votre Puissance</span>
-                        <span class="text-gradient" style="font-weight:800;">NIVEAU 1</span>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <small>PUISSANCE</small>
+                        <!-- C'est ici que s'affiche le 0.00050 -->
+                        <div class="stat-val" id="val-power">0.00000</div>
+                        <small>FTA / sec</small>
                     </div>
-                    <div class="stats-row">
-                        <div class="stat-box">
-                            <div class="stat-val" id="val-power">0.0000</div>
-                            <div class="stat-label">FTA / SEC</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-val" id="val-pending">0.0000</div>
-                            <div class="stat-label">En attente</div>
-                        </div>
+                    <div class="stat-card accent">
+                        <small>EN ATTENTE</small>
+                        <div class="stat-val" id="val-pending">0.00000</div>
+                        <small>FTA</small>
                     </div>
-                    <div style="height:80px; background:rgba(0,0,0,0.3); border-radius:15px; position:relative; overflow:hidden; margin-bottom:20px;">
-                        <canvas id="mining-canvas" style="width:100%; height:100%;"></canvas>
-                        <div id="viz-status" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:#555; font-weight:600; letter-spacing:2px;">OFFLINE</div>
-                    </div>
-                    <button class="btn-neon" onclick="App.claim()">RÉCLAMER</button>
                 </div>
 
-                <!-- Balances -->
-                <div class="card" style="padding: 15px 20px;">
-                    <div class="flex-between" style="margin-bottom:10px;">
-                        <span style="color:var(--text-muted)">USDT Balance</span>
-                        <span style="font-weight:600;" id="bal-usdt">0.00</span>
+                <div class="visualizer-wrap">
+                    <canvas id="mining-canvas"></canvas>
+                    <div class="viz-label" id="viz-status">EN ATTENTE</div>
+                </div>
+
+                <button class="btn-mega" onclick="App.claim()">
+                    <span class="pulse-ring"></span>
+                    RÉCLAMER
+                </button>
+
+                <div class="card balances-card">
+                    <div class="row-between">
+                        <span>💰 USDT</span>
+                        <span class="balance" id="bal-usdt">0.00</span>
                     </div>
-                    <div class="flex-between">
-                        <span style="color:var(--text-muted)">FTA Balance</span>
-                        <span style="font-weight:600; color:var(--primary);" id="bal-fta">0.00</span>
+                    <div class="row-between" style="margin-top:12px;">
+                        <span>💎 FTA</span>
+                        <span class="balance" id="bal-fta">0.00</span>
                     </div>
                 </div>
-            </section>
+            </div>
 
             <!-- SHOP -->
-            <section id="view-shop" class="section">
-                <div class="card">
-                    <div class="flex-between" style="margin-bottom: 20px;">
-                        <h2 style="margin:0; font-size:1.2rem;">Boutique</h2>
-                        <div style="display:flex; gap:5px; background:rgba(255,255,255,0.05); padding:4px; border-radius:12px;">
-                            <button id="btn-usdt" class="btn-glass active" style="padding:5px 15px; font-size:0.8rem;" onclick="App.setPayMode('USDT')">USDT</button>
-                            <button id="btn-fta" class="btn-glass" style="padding:5px 15px; font-size:0.8rem; background:transparent; border:none;" onclick="App.setPayMode('FTA')">FTA</button>
-                        </div>
-                    </div>
-                    <div id="shop-list" class="shop-grid"></div>
-                </div>
-            </section>
-
-            <!-- GAMES -->
-            <section id="view-games" class="section">
-                <div class="card">
-                    <h2 style="margin-top:0; margin-bottom:15px;">Game Center</h2>
-                    <div style="display:flex; gap:10px; margin-bottom:20px; overflow-x:auto; padding-bottom:5px;">
-                        <button class="btn-glass active" onclick="App.showGame('wingo')" style="white-space:nowrap;">Win Go</button>
-                        <button class="btn-glass" onclick="App.showGame('wheel')" style="white-space:nowrap; background:transparent; border:none;">Roue</button>
-                        <button class="btn-glass" onclick="App.showGame('fishing')" style="white-space:nowrap; background:transparent; border:none;">Pêche</button>
-                        <button class="btn-glass" onclick="App.showGame('lottery')" style="white-space:nowrap; background:transparent; border:none;">Loterie</button>
-                    </div>
-
-                    <div id="game-wingo" class="game-area active">
-                        <p style="color:var(--text-muted); margin-bottom:15px;">Misez et devinez.</p>
-                        <input type="number" id="wingo-bet" class="input-neon" placeholder="Mise FTA">
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                            <button class="btn-glass" onclick="App.playWinGo(1,0)">Petit</button>
-                            <button class="btn-glass" onclick="App.playWinGo(1,1)">Grand</button>
-                        </div>
-                    </div>
-
-                    <div id="game-wheel" class="game-area hidden">
-                        <div style="font-size:2.5rem; font-weight:800; color:var(--primary); margin:20px 0;" id="wheel-jackpot">0</div>
-                        <button class="btn-neon" onclick="App.spinWheel()">TOURNER (100 FTA)</button>
-                    </div>
-
-                    <div id="game-fishing" class="game-area hidden">
-                        <p style="color:var(--text-muted);">Attrapez le gros poisson.</p>
-                        <button class="btn-neon" onclick="App.goFishing()">PÊCHER (50 FTA)</button>
-                    </div>
-
-                    <div id="game-lottery" class="game-area hidden">
-                         <div style="font-size:2.5rem; font-weight:800; color:var(--primary); margin:20px 0;" id="lottery-pot">0</div>
-                        <button class="btn-neon" onclick="App.buyLotteryTicket()">TICKET (50 FTA)</button>
+            <div id="view-shop" class="view">
+                <div class="shop-header">
+                    <h2 class="view-title">⛏️ Boutique</h2>
+                    <div class="toggle-pay">
+                        <button id="btn-pay-usdt" class="toggle-btn active" onclick="App.setPayMode('USDT')">USDT</button>
+                        <button id="btn-pay-fta" class="toggle-btn" onclick="App.setPayMode('FTA')">FTA</button>
                     </div>
                 </div>
-            </section>
+                <div id="shop-list" class="grid-list"></div>
+            </div>
 
             <!-- MY RIGS -->
-            <section id="view-my-rigs" class="section">
-                <div class="card">
-                    <h2 style="margin-top:0;">Mes Machines</h2>
-                    <div id="my-rigs-list"></div>
-                    <div id="no-rigs" class="hidden" style="text-align:center; padding:20px; color:var(--text-muted);">Aucune machine active.</div>
+            <div id="view-my-rigs" class="view">
+                <h2 class="view-title">⚙️ Mes Machines</h2>
+                <div id="my-rigs-list" class="rigs-list-container"></div>
+                <div id="no-rigs" class="card" style="text-align:center; display:none;">
+                    <p>Vous n'avez pas encore de machines actives.</p>
                 </div>
-            </section>
+            </div>
+
+            <!-- GAMES -->
+            <div id="view-games" class="view">
+                <h2 class="view-title">🎮 Game Center</h2>
+                
+                <div class="game-tabs">
+                    <button class="game-tab active" onclick="App.showGame('wingo')">Win Go</button>
+                    <button class="game-tab" onclick="App.showGame('wheel')">Roue</button>
+                    <button class="game-tab" onclick="App.showGame('fishing')">Pêche</button>
+                    <button class="game-tab" onclick="App.showGame('lottery')">Loterie</button>
+                </div>
+
+                <!-- Win Go -->
+                <div id="game-wingo" class="game-area active">
+                    <p class="game-info">Deviner le numéro (0-9) ou Grand/Petit.</p>
+                    <input type="number" id="wingo-bet" class="game-input" placeholder="Mise en FTA">
+                    <div class="game-options">
+                        <button onclick="App.playWinGo(1, 0)">Petit (0-4)</button>
+                        <button onclick="App.playWinGo(1, 1)">Grand (5-9)</button>
+                    </div>
+                </div>
+
+                <!-- Roue -->
+                <div id="game-wheel" class="game-area">
+                    <p class="game-info">Tournez pour tenter de gagner le Jackpot !</p>
+                    <div class="jackpot-display">Jackpot: <span id="wheel-jackpot">0</span> FTA</div>
+                    <button class="btn-game" onclick="App.spinWheel()">Tourner (100 FTA)</button>
+                </div>
+
+                <!-- Pêche -->
+                <div id="game-fishing" class="game-area">
+                    <p class="game-info">Lancez votre ligne pour attraper des gains.</p>
+                    <button class="btn-game" onclick="App.goFishing()">Pêcher (50 FTA)</button>
+                </div>
+
+                <!-- Loterie -->
+                <div id="game-lottery" class="game-area">
+                    <p class="game-info">Achetez un ticket pour participer au tirage.</p>
+                    <div class="jackpot-display">Pot: <span id="lottery-pot">0</span> FTA</div>
+                    <button class="btn-game" onclick="App.buyLotteryTicket()">Acheter Ticket (50 FTA)</button>
+                </div>
+            </div>
 
             <!-- SWAP -->
-            <section id="view-swap" class="section">
-                <div class="card">
-                    <h2 style="margin-top:0; margin-bottom:20px;">Swap Instantané</h2>
-                    
-                    <div class="flex-between" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">
+            <div id="view-swap" class="view">
+                <h2 class="view-title">💱 Échange</h2>
+                <div class="card swap-interface">
+                    <div class="swap-header">
                         <span>Vous payez</span>
-                        <span id="swap-bal-from">0</span>
+                        <span>Solde: <span id="swap-bal-from">0</span></span>
                     </div>
-                    <div style="display:flex; background:rgba(0,0,0,0.2); border-radius:12px; padding:4px; margin-bottom:10px;">
-                        <input type="number" id="swap-from-in" class="input-neon" style="border:none; margin:0;" placeholder="0.0" oninput="App.calcSwap()">
-                        <div id="token-from-display" class="btn-glass" onclick="App.toggleSwap()" style="padding:8px 15px; margin:4px;">USDT</div>
+                    <div class="input-wrap">
+                        <input type="number" id="swap-from-in" placeholder="0.0" oninput="App.calcSwap()">
+                        <div class="token-select" onclick="App.toggleSwap()" id="token-from-display">USDT</div>
                     </div>
-
-                    <div style="text-align:center; color:var(--text-muted);">↓</div>
-
-                    <div class="flex-between" style="font-size:0.8rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;">
+                    <div class="swap-arrow-wrap">
+                        <div class="swap-arrow" onclick="App.toggleSwap()">⇅</div>
+                    </div>
+                    <div class="swap-header">
                         <span>Vous recevez</span>
-                        <span id="swap-bal-to">0</span>
+                        <span>Solde: <span id="swap-bal-to">0</span></span>
                     </div>
-                    <div style="display:flex; background:rgba(0,0,0,0.2); border-radius:12px; padding:4px;">
-                        <input type="number" id="swap-to-in" class="input-neon" style="border:none; margin:0;" placeholder="0.0" readonly>
-                        <div id="token-to-display" class="btn-glass" style="padding:8px 15px; margin:4px; background:rgba(255,255,255,0.05); cursor:default;">FTA</div>
+                    <div class="input-wrap">
+                        <input type="number" id="swap-to-in" placeholder="0.0" readonly>
+                        <div class="token-select" style="background:#333; cursor:default;" id="token-to-display">FTA</div>
                     </div>
-
-                    <div style="text-align:center; font-size:0.8rem; color:var(--text-muted); margin:15px 0;" id="swap-rate">1 USDT = ? FTA</div>
-                    <button class="btn-neon" onclick="App.executeSwap()">ÉCHANGER</button>
+                    <div class="rate-info" id="swap-rate">Chargement...</div>
+                    <button class="btn-primary" onclick="App.executeSwap()">ÉCHANGER</button>
                 </div>
-            </section>
+            </div>
 
         </main>
+
+        <!-- NAVIGATION -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" onclick="App.nav('dashboard')">
+                <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" onclick="App.nav('shop')">
+                <svg viewBox="0 0 24 24"><path d="M12 2l-5.5 9h11z"/></svg>
+                <span>Shop</span>
+            </button>
+            <button class="nav-item" onclick="App.nav('my-rigs')">
+                <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
+                <span>Mes Rigs</span>
+            </button>
+            <button class="nav-item" onclick="App.nav('games')">
+                <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                <span>Jeux</span>
+            </button>
+            <button class="nav-item" onclick="App.nav('swap')">
+                <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
+                <span>Swap</span>
+            </button>
+        </nav>
+
     </div>
 
-    <!-- FLOATING NAVIGATION -->
-    <nav class="float-nav">
-        <button class="nav-btn active" onclick="App.nav('dashboard')">
-            <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
-            <span>Home</span>
-        </button>
-        <button class="nav-btn" onclick="App.nav('shop')">
-            <svg viewBox="0 0 24 24"><path d="M12 2l-5.5 9h11z"/></svg>
-            <span>Shop</span>
-        </button>
-        <button class="nav-btn" onclick="App.nav('my-rigs')">
-            <svg viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-            <span>Rigs</span>
-        </button>
-        <button class="nav-btn" onclick="App.nav('games')">
-            <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-            <span>Jeux</span>
-        </button>
-        <button class="nav-btn" onclick="App.nav('swap')">
-            <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>
-            <span>Swap</span>
-        </button>
-    </nav>
+    <div id="loader" class="loader hidden">
+        <div class="spinner-ring"></div>
+        <p id="loader-text">Traitement...</p>
+    </div>
 
-    <!-- JAVASCRIPT COMPLET ET CORRIGÉ -->
-    <script>
-        // CONFIGURATION
-        const CONFIG = {
-            MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", 
-            FTA: "0x535bBe393D64a60E14B731b7350675792d501623", 
-            USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 
-            CHAIN_ID: 137
-        };
-        const MINING_ABI = ["function getActivePower(address) view returns (uint256)","function getMachineCount() view returns (uint256)","function getUserMachineCount(address,uint256)view returns(uint256)","function machineTypes(uint256)view returns(uint256,uint256)","function difficultyMultiplier()view returns(uint256)","function exchangeRate()view returns(uint256)","function getWheelJackpot()view returns(uint256)","function getLotteryPool()view returns(uint256)","function buyMachine(uint256)","function buyMachineWithFTA(uint256)","function claimRewards()","function setReferrer(address)","function swapUsdtForFta(uint256)","function swapFtaForUsdt(uint256)","function playWinGo(uint256,uint8,uint8)","function spinWheel()","function goFishing()","function buyLotteryTicket()"];
-        const ERC20_ABI = ["function balanceOf(address)view returns(uint256)","function decimals()view returns(uint8)","function approve(address,uint256)","function allowance(address,address)view returns(uint256)"];
-
-        class Application {
-            constructor() { 
-                this.p=null; this.s=null; this.c={}; this.u=null; this.r=0; this.m='USDT'; this.d='USDT_TO_FTA'; 
-                this.dec=18; this.mul=1000000000000000000n; this.pow=0; this.bal=0; this.tmr=null; this.key="fitia"; 
-                this.shop=[]; this.load=false; this.vCtx=null; this.vBars=[]; 
-            }
-            
-            async init() { 
-                if(window.ethereum){
-                    this.p=new ethers.BrowserProvider(window.ethereum);
-                    window.ethereum.on('accountsChanged',()=>location.reload());
-                    window.ethereum.on('chainChanged',()=>location.reload());
-                } 
-            }
-            
-            async connect() { 
-                if(!window.ethereum)return; this.setL(true,"Connexion..."); 
-                try { 
-                    await ethereum.request({method:'eth_requestAccounts'}); this.s=await this.p.getSigner(); this.u=await this.s.getAddress(); 
-                    if((await this.p.getNetwork()).chainId!=CONFIG.CHAIN_ID) await this.sw(); 
-                    this.c.u=new ethers.Contract(CONFIG.USDT,ERC20_ABI,this.s); this.c.f=new ethers.Contract(CONFIG.FTA,ERC20_ABI,this.s); this.c.m=new ethers.Contract(CONFIG.MINING,MINING_ABI,this.s); 
-                    try{this.dec=await this.c.f.decimals();}catch{}; 
-                    $('#btn-connect').classList.add('hidden'); $('#wallet-status').classList.remove('hidden'); $('#addr-display').innerText=this.u.slice(0,6)+"..."+this.u.slice(38); 
-                    this.chkRef(); 
-                    $('#ref-link').value = location.origin+"?ref="+this.u; 
-                    await this.upd(); setInterval(()=>this.upd(),5000); this.initV(); 
-                } catch(e) { this.t("Erreur",1); console.error(e); } this.setL(false); 
-            }
-            
-            async sw(){try{await ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:'0x89'}]});}catch(e){if(e.code==4902)await ethereum.request({method:'wallet_addEthereumChain',params:[{chainId:'0x89',chainName:'Polygon',nativeCurrency:{name:'MATIC',symbol:'MATIC',decimals:18},rpcUrls:['https://polygon-rpc.com/'],blockExplorerUrls:['https://polygonscan.com/']}]});}}
-            
-            chkRef(){ let p=new URLSearchParams(location.search).get('ref'); if(p&&ethers.isAddress(p)){$('#detected-ref').innerText=p;$('#bind-ref-area').style.display='block';} }
-            
-            async bindReferrer(){ let a=$('#detected-ref').innerText; if(!ethers.isAddress(a))return; this.setL(true,"Liaison..."); try{ await(await this.c.m.setReferrer(a)).wait(); this.t("Parrain lié !"); $('#bind-ref-area').style.display='none'; }catch(e){this.shE(e);} this.setL(false); }
-            
-            copyLink(){ let v=$('#ref-link').value; if(v=="Connectez-vous...") return this.t("Connectez-vous d'abord",1); navigator.clipboard.writeText(v); this.t("Lien copié !"); }
-
-            async upd(){ if(!this.u)return; try{ let p=await this.c.m.getActivePower(this.u); try{this.mul=await this.c.m.difficultyMultiplier();}catch{} let bn=(p*this.mul)/1000000000000000000n; this.pow=parseFloat(ethers.formatUnits(bn,8)); let l=localStorage.getItem(this.key)||Math.floor(Date.now()/1000); let t=Math.floor(Date.now()/1000)-parseInt(l); if(this.pow>0){this.bal=this.pow*t; $('#viz-status').innerText="MINING"; $('#viz-status').style.color="var(--primary)"; this.updV(this.pow); if(!this.tmr)this.str();} else { this.stp(); $('#viz-status').innerText="OFFLINE"; $('#viz-status').style.color="#333"; } $('#val-power').innerText=this.pow.toFixed(5); if(!this.tmr)$('#val-pending').innerText=this.bal.toFixed(5); let uBal=await this.c.u.balanceOf(this.u); let fBal=await this.c.f.balanceOf(this.u); $('#bal-usdt').innerText=parseFloat(ethers.formatUnits(uBal,6)).toFixed(2); $('#bal-fta').innerText=parseFloat(ethers.formatUnits(fBal,this.dec)).toFixed(2); let r=await this.c.m.exchangeRate(); this.r=parseFloat(ethers.formatUnits(r,8)); $('#swap-rate').innerText=`1 USDT = ${this.r.toFixed(2)} FTA`; let fB=this.d=='USDT_TO_FTA'?uBal:fBal; let tB=this.d=='USDT_TO_FTA'?fBal:uBal; $('#swap-bal-from').innerText=parseFloat(ethers.formatUnits(fB,this.d=='USDT_TO_FTA'?6:this.dec)).toFixed(2); $('#swap-bal-to').innerText=parseFloat(ethers.formatUnits(tB,this.d=='USDT_TO_FTA'?this.dec:6)).toFixed(2); await this.rSh(false); try{$('#wheel-jackpot').innerText=parseFloat(ethers.formatUnits(await this.c.m.getWheelJackpot(),this.dec)).toFixed(2);$('#lottery-pot').innerText=parseFloat(ethers.formatUnits(await this.c.m.getLotteryPool(),this.dec)).toFixed(2);}catch{} }catch(e){console.error(e);} }
-            
-            str(){if(this.tmr)return;this.tmr=setInterval(()=>{if(this.pow>0){this.bal+=this.pow;$('#val-pending').innerText=this.bal.toFixed(5);$('#val-pending').style.color='var(--primary)';setTimeout(()=>$('#val-pending').style.color='white',500);}},1000);}
-            stp(){if(this.tmr){clearInterval(this.tmr);this.tmr=null;}}
-            
-            setPayMode(m){this.m=m;$('#btn-usdt').classList.toggle('active',m=='USDT');$('#btn-fta').classList.toggle('active',m=='FTA');this.rSh(false);}
-            
-            async rSh(f){ if(this.load)return; let c=$('#shop-list'); if(this.shop.length>0&&!f){this._rSh(c);return;} this.load=true; try{ let n=await this.c.m.getMachineCount(); let pr=[]; for(let i=0;i<n;i++)pr.push(this.c.m.machineTypes(i)); let res=await Promise.all(pr); this.shop=[]; for(let i=0;i<n;i++){ let d=res[i]; let pu=parseFloat(ethers.formatUnits(d.price,6)); let pf=pu*this.r; let pB=BigInt(d.power.toString()); let eB=(pB*this.mul)/1000000000000000000n; let p=parseFloat(ethers.formatUnits(eB,8)); this.shop.push({p:pu,pw:p,pf:pf}); } this._rSh(c); }catch{} this.load=false; }
-            
-            _rSh(c){ c.innerHTML=''; for(let i=0;i<this.shop.length;i++){ let d=this.shop[i]; let div=document.createElement('div'); div.className='shop-item'; div.innerHTML=`<div style="font-size:0.9rem; font-weight:600;">RIG ${i+1}</div><div style="color:var(--accent); font-size:0.8rem; margin:5px 0;">${d.pw.toFixed(5)} FTA/s</div><div style="color:var(--primary); font-weight:bold; margin-bottom:10px;">${this.m=='USDT'?d.p.toFixed(2)+' $':d.pf.toFixed(2)+' FTA'}</div><button class="btn-glass" style="width:100%; padding:8px;" onclick="App.buyMachine(${i})">Acheter</button>`; c.appendChild(div); } }
-            
-            async buyMachine(id){ if(!this.u)return this.connect(); this.setL(true,"Tx..."); try{ let m=await this.c.m.machineTypes(id); if(this.m=='USDT'){ let a=await this.c.u.allowance(this.u,CONFIG.MINING); if(a<m.price)await(await this.c.u.approve(CONFIG.MINING,m.price)).wait(); await(await this.c.m.buyMachine(id)).wait(); } else { let r=await this.c.m.exchangeRate(); let fp=(m.price*r)/1000000n; let a=await this.c.f.allowance(this.u,CONFIG.MINING); if(a<fp)await(await this.c.f.approve(CONFIG.MINING,fp)).wait(); await(await this.c.m.buyMachineWithFTA(id)).wait(); } this.t("Succès !"); localStorage.setItem(this.key,Math.floor(Date.now()/1000)); this.bal=0; this.load=false; await this.rSh(true); await this.chk(); this.upd(); }catch(e){this.shE(e);} this.setL(false); }
-            
-            async claim(){ if(!this.u)return; this.stp(); this.setL(true,"Claim..."); try{ await(await this.c.m.claimRewards()).wait(); this.bal=0; localStorage.setItem(this.key,Math.floor(Date.now()/1000)); this.t("Réclamé !"); this.upd(); if(this.pow>0)this.str(); }catch(e){this.shE(e);this.str();} this.setL(false); }
-            
-            toggleSwap(){this.d=this.d=='USDT_TO_FTA'?'FTA_TO_USDT':'USDT_TO_FTA';$('#token-from-display').innerText=this.d=='USDT_TO_FTA'?'USDT':'FTA';$('#token-to-display').innerText=this.d=='USDT_TO_FTA'?'FTA':'USDT';this.upd();}
-            calcSwap(){let v=$('#swap-from-in').value; if(!v)return $('#swap-to-in').value=''; let r=this.d=='USDT_TO_FTA'?v*this.r:v/this.r; $('#swap-to-in').value=r.toFixed(5);}
-            
-            async executeSwap(){ let v=$('#swap-from-in').value; if(!v||v<=0)return this.t("Montant invalide",1); this.setL(true,"Swap..."); let isU=this.d=='USDT_TO_FTA'; let dec=isU?6:this.dec; let am=ethers.parseUnits(v,dec); try{ let tc=isU?this.c.u:this.c.f; let al=await tc.allowance(this.u,CONFIG.MINING); if(al<am){await(await tc.approve(CONFIG.MINING,am)).wait();} let tx=isU?await this.c.m.swapUsdtForFta(am):await this.c.m.swapFtaForUsdt(am); await tx.wait(); this.t("Échangé !"); $('#swap-from-in').value=''; this.upd(); }catch(e){this.shE(e);} this.setL(false); }
-            
-            nav(v){ $$('.section').forEach(e=>{e.classList.remove('active');}); $('#view-'+v).classList.add('active'); $$('.nav-btn').forEach(e=>e.classList.remove('active')); if(event)event.currentTarget.classList.add('active'); if(v=='my-rigs')this.chk(); }
-            
-            async chk(){ let c=$('#my-rigs-list'); let nr=$('#no-rigs'); c.innerHTML=''; if(!this.u)return; try{ let n=await this.c.m.getMachineCount(); let pr=[]; for(let i=0;i<n;i++)pr.push(this.c.m.getUserMachineCount(this.u,i)); let res=await Promise.all(pr); let f=false; for(let i=0;i<n;i++){ if(res[i]>0){ f=true; let pw=this.shop[i]?this.shop[i].pw.toFixed(5):"N/A"; let div=document.createElement('div'); div.className='card'; div.style.padding='15px'; div.style.marginBottom='10px'; div.innerHTML=`<div class="flex-between"><div><h4 style="margin:0">RIG ${i+1} <span style="opacity:0.5">x${res[i]}</span></h4><p style="margin:5px 0 0; font-size:0.8rem; color:var(--text-muted);">${pw} FTA/s</p></div><span style="color:var(--primary); font-weight:bold;">ACTIF</span></div>`; c.appendChild(div); }} nr.classList.toggle('hidden',f); }catch{} }
-            
-            initV(){ let cv=$('#mining-canvas'); if(!cv)return; cv.width=cv.offsetWidth*2; cv.height=cv.offsetHeight*2; this.vCtx=cv.getContext('2d'); this.vBars=[]; for(let i=0;i<20;i++)this.vBars.push({h:0,t:0}); this.aV(); }
-            updV(p){ let i=p>0?Math.min((p*500)+10,100):0; this.vBars.forEach(b=>b.t=(this.vCtx.canvas.height*(i/100))*Math.random()); }
-            aV(){ if(!this.vCtx)return; let cx=this.vCtx; cx.clearRect(0,0,cx.canvas.width,cx.canvas.height); cx.fillStyle="#00ff9d"; let w=cx.canvas.width/20; this.vBars.forEach((b,i)=>{ b.h+=(b.t-b.h)*0.1; cx.fillRect(i*w+2,cx.canvas.height-b.h,w-4,b.h); b.t+=(Math.random()-0.5)*10; }); requestAnimationFrame(()=>this.aV()); }
-            
-            showGame(id){ $$('.game-area').forEach(e=>e.classList.add('hidden')); $('#game-'+id).classList.remove('hidden'); $$('.card .btn-glass').forEach(b=>{if(b.onclick&&b.onclick.toString().includes('showGame')){b.classList.remove('active');b.style.background='transparent';}}); }
-            
-            async playWinGo(t,c){ let v=$('#wingo-bet').value; if(!v)return; let am=ethers.parseUnits(v,this.dec); this.setL(true,"Jeu..."); try{ let al=await this.c.f.allowance(this.u,CONFIG.MINING); if(al<am)await(await this.c.f.approve(CONFIG.MINING,am)).wait(); await(await this.c.m.playWinGo(am,t,c)).wait(); this.t("Terminé !"); this.upd(); }catch(e){this.shE(e);} this.setL(false); }
-            
-            async spinWheel(){ this.setL(true,"Roue..."); try{ let p=ethers.parseUnits("100",this.dec); let al=await this.c.f.allowance(this.u,CONFIG.MINING); if(al<p)await(await this.c.f.approve(CONFIG.MINING,p)).wait(); await(await this.c.m.spinWheel()).wait(); this.t("Résultat !"); this.upd(); }catch(e){this.shE(e);} this.setL(false); }
-            
-            async goFishing(){ this.setL(true,"Pêche..."); try{ let p=ethers.parseUnits("50",this.dec); let al=await this.c.f.allowance(this.u,CONFIG.MINING); if(al<p)await(await this.c.f.approve(CONFIG.MINING,p)).wait(); await(await this.c.m.goFishing()).wait(); this.t("Pêche !"); this.upd(); }catch(e){this.shE(e);} this.setL(false); }
-            
-            async buyLotteryTicket(){ this.setL(true,"Ticket..."); try{ let p=ethers.parseUnits("50",this.dec); let al=await this.c.f.allowance(this.u,CONFIG.MINING); if(al<p)await(await this.c.f.approve(CONFIG.MINING,p)).wait(); await(await this.c.m.buyLotteryTicket()).wait(); this.t("Acheté !"); this.upd(); }catch(e){this.shE(e);} this.setL(false); }
-            
-            setL(s,m="Chargement..."){ let l=$('#loader'); $('#loader-text').innerText=m; s?l.classList.remove('hidden'):l.classList.add('hidden'); }
-            
-            shE(e){ console.error(e); let m="Erreur"; if(e.reason)m=e.reason; if(m.includes("Invalid bet"))m="Mise invalide"; if(m.includes("insufficient funds"))m="Fonds insuffisants"; this.t(m,1); }
-            
-            t(m,e){ let d=document.createElement('div'); d.className='toast'; if(e)d.style.borderColor='var(--danger)'; d.innerText=m; $('#toast-container').appendChild(d); setTimeout(()=>d.remove(),4000); }
-        }
-
-        // Helpers
-        let $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-
-        const App = new Application();
-        window.onload = () => App.init();
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
