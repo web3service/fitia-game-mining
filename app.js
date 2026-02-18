@@ -2,11 +2,10 @@
 // CONFIGURATION
 // ==========================================
 const CONFIG = {
-    // VÉRIFIEZ BIEN CES ADRESSES (40 caractères après 0x)
-    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", 
-    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", 
+    MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", // VOTRE ADRESSE CONTRAT MINING
+    FTA: "0x535bBe393D64a60E14B731b7350675792d501623", // VOTRE ADRESSE TOKEN FTA
     USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 
-    CHAIN_ID: 137 // 137 = Polygon Mainnet
+    CHAIN_ID: 137
 };
 
 const MINING_ABI = [
@@ -38,7 +37,7 @@ const ERC20_ABI = [
 ];
 
 // ==========================================
-// LOGIQUE AVEC DEBUG
+// LOGIQUE
 // ==========================================
 class Application {
     constructor() {
@@ -46,7 +45,7 @@ class Application {
         this.currentRate = 0; this.payMode = 'USDT'; this.swapDirection = 'USDT_TO_FTA';
         this.ftaDecimals = 18; this.currentMultiplier = 1000000000000000000n;
         this.currentRealPower = 0; this.pendingBalance = 0;    
-        this.miningTimer = null; this.storageKey = "fitia_last_claim_time";
+        this.miningTimer = null; this.storageKey = "fitia_last_claim_time_v2"; // Clé mise à jour pour clean les anciens bugs
         this.shopData = []; this.isLoadingShop = false; 
         this.vizContext = null; this.vizBars = [];
     }
@@ -67,19 +66,8 @@ class Application {
             this.signer = await this.provider.getSigner();
             this.user = await this.signer.getAddress();
 
-            // 1. Vérification Réseau
             const network = await this.provider.getNetwork();
-            if (Number(network.chainId) !== CONFIG.CHAIN_ID) {
-                this.showToast("Mauvais réseau ! Sélectionnez Polygon", true);
-                await this.switchNetwork();
-            }
-
-            // 2. Vérification Adresses
-            if (!ethers.isAddress(CONFIG.MINING) || !ethers.isAddress(CONFIG.FTA)) {
-                 this.showToast("ERREUR: Adresse Contrat Invalide dans le code JS", true);
-                 this.setLoader(false);
-                 return;
-            }
+            if (Number(network.chainId) !== CONFIG.CHAIN_ID) await this.switchNetwork();
 
             this.contracts.usdt = new ethers.Contract(CONFIG.USDT, ERC20_ABI, this.signer);
             this.contracts.fta = new ethers.Contract(CONFIG.FTA, ERC20_ABI, this.signer);
@@ -94,17 +82,17 @@ class Application {
             this.checkReferral();
             document.getElementById('ref-link').value = window.location.origin + "?ref=" + this.user;
 
-            // Premier refresh avec gestion d'erreur détaillée
-            await this.updateData(true); 
-            
-            setInterval(() => this.updateData(false), 5000);
+            // Initialisation du temps si c'est la première connexion
+            if (!localStorage.getItem(this.storageKey)) {
+                localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
+            }
+
+            await this.updateData();
+            setInterval(() => this.updateData(), 5000);
             this.initVisualizer();
             window.addEventListener('resize', () => this.resizeCanvas());
             
-        } catch (e) { 
-            console.error(e); 
-            this.showError(e); 
-        }
+        } catch (e) { this.showToast("Erreur connexion", true); console.error(e); }
         this.setLoader(false);
     }
 
@@ -125,13 +113,10 @@ class Application {
         }
     }
 
-    // Ajout du paramètre 'showErrorToUser' pour décider d'afficher ou non l'erreur
-    async updateData(showErrorToUser = false) {
+    async updateData() {
         if (!this.user) return;
         try {
-            // TENTATIVE DE LECTURE
             const rawPower = await this.contracts.mining.getActivePower(this.user);
-            
             try { 
                 this.currentMultiplier = await this.contracts.mining.difficultyMultiplier(); 
             } catch(e) { 
@@ -141,11 +126,17 @@ class Application {
             const realPowerBN = (rawPower * this.currentMultiplier) / 1000000000000000000n;
             this.currentRealPower = parseFloat(ethers.formatUnits(realPowerBN, 8)); 
 
-            let lastClaim = localStorage.getItem(this.storageKey) || Math.floor(Date.now() / 1000);
-            const timePassed = Math.floor(Date.now() / 1000) - parseInt(lastClaim);
+            // On récupère le temps stocké
+            const lastClaim = parseInt(localStorage.getItem(this.storageKey));
+            const timePassed = Math.floor(Date.now() / 1000) - lastClaim;
             
             if (this.currentRealPower > 0) {
-                this.pendingBalance = this.currentRealPower * timePassed;
+                // On ne calcule la balance que si le timer n'est pas actif (pour éviter les conflits d'affichage)
+                if (!this.miningTimer) {
+                    this.pendingBalance = this.currentRealPower * timePassed;
+                    document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
+                }
+                
                 document.getElementById('viz-status').innerText = "MINAGE ACTIF";
                 document.getElementById('viz-status').style.color = "var(--primary)";
                 this.updateVisualizerIntensity(this.currentRealPower);
@@ -154,10 +145,12 @@ class Application {
                 this.stopMiningCounter();
                 document.getElementById('viz-status').innerText = "AUCUNE MACHINE";
                 document.getElementById('viz-status').style.color = "#666";
+                // Si pas de puissance, on met à jour le texte manuellement
+                this.pendingBalance = 0;
+                document.getElementById('val-pending').innerText = "0.00000";
             }
 
             document.getElementById('val-power').innerText = this.currentRealPower.toFixed(5);
-            if (!this.miningTimer) document.getElementById('val-pending').innerText = this.pendingBalance.toFixed(5);
 
             const usdtBal = await this.contracts.usdt.balanceOf(this.user);
             const ftaBal = await this.contracts.fta.balanceOf(this.user);
@@ -180,23 +173,7 @@ class Application {
                 document.getElementById('lottery-pot').innerText = parseFloat(ethers.formatUnits(await this.contracts.mining.getLotteryPool(), this.ftaDecimals)).toFixed(2);
             } catch(e) {}
 
-        } catch (e) { 
-            console.error("Erreur Critique updateData", e);
-            // SI c'est le premier chargement, on affiche l'erreur à l'écran
-            if (showErrorToUser) {
-                let msg = "Erreur Contrat: ";
-                if (e.reason) msg += e.reason;
-                else if (e.message) msg += e.message.substring(0, 50);
-                else msg += "Inconnu";
-                
-                // Erreurs courantes traduites
-                if (msg.includes("could not decode result data")) msg = "Erreur: Le contrat ne répond pas. Vérifiez l'adresse du contrat et le réseau (Polygon).";
-                if (msg.includes("call revert")) msg = "Le contrat a rejeté l'appel (Adresse incorrecte ?).";
-                if (msg.includes("network changed")) msg = "Le réseau a changé. Rechargez la page.";
-                
-                this.showToast(msg, true);
-            }
-        }
+        } catch (e) { console.error("Refresh Error", e); }
     }
 
     startMiningCounter() {
@@ -248,11 +225,11 @@ class Application {
         this.renderShop(false);
     }
 
-    async renderShop(force = false) {
+    async renderShop(forceFetch = false) {
         if (this.isLoadingShop) return;
         const container = document.getElementById('shop-list');
         
-        if (this.shopData.length > 0 && !force) {
+        if (this.shopData.length > 0 && !forceFetch) {
             this._renderShopHTML(container);
             return;
         }
@@ -317,8 +294,10 @@ class Application {
                 await (await this.contracts.mining.buyMachineWithFTA(id)).wait();
             }
             this.showToast("Achat réussi !");
-            localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
-            this.pendingBalance = 0;
+            
+            // IMPORTANT : On ne remet PAS le compteur à zéro ici.
+            // Le minage continue et s'ajoute aux gains précédents.
+            
             this.isLoadingShop = false; 
             await this.renderShop(true);
             await this.checkMyMachines(); 
@@ -365,10 +344,14 @@ class Application {
         this.setLoader(true, "Claim...");
         try {
             await (await this.contracts.mining.claimRewards()).wait();
+            
+            // C'est ICI et SEULEMENT ICI qu'on remet à zéro
             this.pendingBalance = 0;
             localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000));
+            
             this.showToast("Gains réclamés !");
             this.updateData();
+            // On redémarre le compteur pour la prochaine session de minage
             if (this.currentRealPower > 0) this.startMiningCounter();
         } catch(e) { this.showError(e); this.startMiningCounter(); }
         this.setLoader(false);
@@ -524,7 +507,7 @@ class Application {
         if (isError) div.style.borderLeftColor = 'var(--danger)';
         div.innerText = msg;
         document.getElementById('toast-container').appendChild(div);
-        setTimeout(() => div.remove(), 5000); // 5 secondes pour lire
+        setTimeout(() => div.remove(), 4000);
     }
 }
 
