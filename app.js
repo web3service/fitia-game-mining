@@ -48,7 +48,6 @@ class Application {
         this.tmr=null; this.key="fitia_last_claim_time_v2";
         this.shop=[]; this.load=false; 
         this.vCtx=null; this.vBars=[];
-        // Wheel State
         this.wheelState = { angle: 0, ctx: null };
     }
 
@@ -72,7 +71,6 @@ class Application {
             this.c.m=new ethers.Contract(CONFIG.MINING,MINING_ABI,this.s);
             try{this.dec=await this.c.f.decimals();}catch{}
             
-            // Init LocalStorage
             if(!localStorage.getItem(this.key)) localStorage.setItem(this.key, Math.floor(Date.now()/1000));
 
             $('#btn-connect').classList.add('hidden');
@@ -82,7 +80,7 @@ class Application {
             this.chkRef(); $('#ref-link').value=location.origin+"?ref="+this.u;
             await this.upd(); setInterval(()=>this.upd(),5000);
             this.initV();
-            this.initWheel(); // Init Wheel Canvas
+            this.initWheel(); 
         } catch(e) { console.error(e); this.t("Erreur",1); }
         this.setL(false);
     }
@@ -101,7 +99,7 @@ class Application {
             const timePassed=Math.floor(Date.now()/1000)-lastClaim;
             
             if(this.pow>0){
-                if(!this.tmr) this.bal=this.pow*timePassed; // Calc pending
+                if(!this.tmr) this.bal=this.pow*timePassed;
                 $('#viz-status').innerText="MINAGE ACTIF"; $('#viz-status').style.color="var(--primary)";
                 this.updV(this.pow); if(!this.tmr)this.str();
             } else {
@@ -136,9 +134,28 @@ class Application {
     async bindReferrer(){let a=$('#detected-ref').innerText;if(!ethers.isAddress(a))return;this.setL(true,"Liaison...");try{await(await this.c.m.setReferrer(a)).wait();this.t("Parrain lié !");$('#bind-ref-area').style.display='none';}catch(e){this.shE(e);}this.setL(false);}
     copyLink(){let v=$('#ref-link').value;if(!v||v=="Connectez-vous...")return this.t("Connectez-vous d'abord",1);navigator.clipboard.writeText(v);this.t("Lien copié !");}
 
+    // --- BOUTIQUE (CORRECTION ICI) ---
     setM(m){this.m=m;$('#btn-pay-usdt').classList.toggle('active',m=='USDT');$('#btn-pay-fta').classList.toggle('active',m=='FTA');this.rSh(false);}
-    async rSh(f){ if(this.load)return; let c=$('#shop-list'); if(this.shop.length>0&&!f){this._rSh(c);return;} this.load=true; try{ let n=await this.c.m.getMachineCount(); let pr=[]; for(let i=0;i<n;i++)pr.push(this.c.m.machineTypes(i)); let res=await Promise.all(pr); this.shop=[]; for(let i=0;i<n;i++){ let d=res[i]; let pu=parseFloat(ethers.formatUnits(d.price,6)); let pf=pu*this.r; let pB=BigInt(d.power.toString()); let eB=(pB*this.mul)/1000000000000000000n; let p=parseFloat(ethers.formatUnits(eB,8)); this.shop.push({p:pu,pw:p,pf:pf}); } this._rSh(c); }catch{} this.load=false; }
-    _rSh(c){ c.innerHTML=''; for(let i=0;i<this.shop.length;i++){ let d=this.shop[i]; let div=document.createElement('div'); div.className='rig-item'; div.innerHTML=`<div><span class="rig-name">RIG ${i+1}</span><span class="rig-power">${d.pw.toFixed(5)} FTA/s</span></div><div><span class="rig-price">${this.m=='USDT'?d.p.toFixed(2)+' $':d.pf.toFixed(2)+' FTA'}</span><button class="btn-primary" style="padding:8px;font-size:0.8rem" onclick="App.bM(${i})">ACHETER</button></div>`; c.appendChild(div); }}
+    
+    async rSh(f){ if(this.load)return; let c=$('#shop-list'); if(this.shop.length>0&&!f){this._rSh(c);return;} this.load=true; try{ let n=await this.c.m.getMachineCount(); let pr=[]; for(let i=0;i<n;i++)pr.push(this.c.m.machineTypes(i)); let res=await Promise.all(pr); this.shop=[]; for(let i=0;i<n;i++){ let d=res[i]; let pu=parseFloat(ethers.formatUnits(d.price,6)); let pB=BigInt(d.power.toString()); let eB=(pB*this.mul)/1000000000000000000n; let p=parseFloat(ethers.formatUnits(eB,8)); this.shop.push({p:pu,pw:p}); } this._rSh(c); }catch{} this.load=false; }
+    
+    _rSh(c){ 
+        c.innerHTML=''; 
+        for(let i=0;i<this.shop.length;i++){ 
+            let d=this.shop[i]; 
+            // Calcul dynamique du prix FTA pour être toujours à jour
+            let ftaPrice = d.p * this.r;
+            const div=document.createElement('div');
+            div.className='rig-item';
+            div.innerHTML=`
+                <div><span class="rig-name">RIG ${i+1}</span><span class="rig-power">${d.pw.toFixed(5)} FTA/s</span></div>
+                <div>
+                    <span class="rig-price">${this.m=='USDT'?d.p.toFixed(2)+' $':ftaPrice.toFixed(2)+' FTA'}</span>
+                    <button class="btn-primary" style="padding:8px;font-size:0.8rem" onclick="App.bM(${i})">ACHETER</button>
+                </div>`;
+            c.appendChild(div);
+        }
+    }
     
     async bM(id){ if(!this.u)return this.connect(); this.setL(true,"Transaction..."); try{ let m=await this.c.m.machineTypes(id); if(this.m=='USDT'){ let a=await this.c.u.allowance(this.u,CONFIG.MINING); if(a<m.price)await(await this.c.u.approve(CONFIG.MINING,m.price)).wait(); await(await this.c.m.buyMachine(id)).wait(); } else { let r=await this.c.m.exchangeRate(); let fp=(m.price*r)/1000000n; let a=await this.c.f.allowance(this.u,CONFIG.MINING); if(a<fp)await(await this.c.f.approve(CONFIG.MINING,fp)).wait(); await(await this.c.m.buyMachineWithFTA(id)).wait(); } this.t("Achat réussi !"); this.load=false; await this.rSh(true); await this.chk(); this.upd(); }catch(e){this.shE(e);} this.setL(false); }
 
@@ -151,7 +168,7 @@ class Application {
     nav(v){ $$('.view').forEach(e=>{e.classList.remove('active');e.style.display='none';}); $('#view-'+v).classList.add('active'); $('#view-'+v).style.display='block'; $$('.nav-item').forEach(e=>e.classList.remove('active')); if(event&&event.currentTarget)event.currentTarget.classList.add('active'); if(v=='my-rigs')this.chk(); }
     async chk(){ let c=$('#my-rigs-list'); let nr=$('#no-rigs'); c.innerHTML=''; if(!this.u)return; try{ let n=await this.c.m.getMachineCount(); let pr=[]; for(let i=0;i<n;i++)pr.push(this.c.m.getUserMachineCount(this.u,i)); let res=await Promise.all(pr); let f=false; for(let i=0;i<n;i++){ if(res[i]>0){ f=true; let pw=this.shop[i]?this.shop[i].pw.toFixed(5):"N/A"; let div=document.createElement('div'); div.className='my-rig-card active'; div.innerHTML=`<div class="rig-info"><h4>RIG ${i+1} <span style="opacity:0.5">x${res[i]}</span></h4><p style="margin:0;color:var(--text-muted);font-size:0.8rem">${pw} FTA/s</p></div><span class="rig-status-badge status-active">ACTIF</span>`; c.appendChild(div); }} nr.classList.toggle('hidden',f); }catch(e){console.error(e);} }
 
-    // --- GAMES VISUALS ---
+    // --- GAMES VISUALS (ANIMATION AVANT SIGNATURE) ---
     showGame(id){ $$('.game-area').forEach(e=>e.classList.remove('active')); $('#game-'+id).classList.add('active'); $$('.game-tab').forEach(btn=>btn.classList.remove('active')); event.currentTarget.classList.add('active'); }
 
     // WIN GO
@@ -160,19 +177,23 @@ class Application {
         if (!betVal || betVal <= 0) return this.showToast("Mise invalide", true);
         const amount = ethers.parseUnits(betVal, this.dec);
         
-        // Start Visual
+        // 1. Start Animation IMMEDIATELY
         const reel = $('#slot-reel');
+        const btns = $$('.game-btn'); btns.forEach(b => b.disabled = true); // Disable buttons
         reel.classList.add('spinning');
         
-        this.setL(true, "Jeu...");
         try {
             const allow = await this.c.f.allowance(this.u, CONFIG.MINING);
             if (allow < amount) await (await this.c.f.approve(CONFIG.MINING, amount)).wait();
-            await (await this.c.m.playWinGo(amount, type, choice)).wait();
             
-            // Stop Visual
+            // 2. Send Transaction (User sees animation while signing)
+            const tx = await this.c.m.playWinGo(amount, type, choice);
+            
+            // 3. Wait for confirmation
+            await tx.wait();
+            
+            // 4. Stop and show result
             reel.classList.remove('spinning');
-            // Show random result for feedback (Real result should be from event)
             const randomNum = Math.floor(Math.random() * 10);
             const finalOffset = -80 * randomNum; 
             reel.style.transform = `translateY(${finalOffset}px)`;
@@ -183,7 +204,7 @@ class Application {
             reel.style.transform = 'translateY(0px)';
             this.shE(e); 
         }
-        this.setL(false);
+        btns.forEach(b => b.disabled = false);
     }
 
     // WHEEL
@@ -227,7 +248,6 @@ class Application {
             ctx.fillText(segments[i], 110, 5);
             ctx.restore();
         }
-        // Center circle
         ctx.beginPath();
         ctx.arc(150, 150, 20, 0, 2 * Math.PI);
         ctx.fillStyle = "#000";
@@ -236,30 +256,34 @@ class Application {
     }
 
     async spinWheel() {
-        this.setL(true, "Roue...");
+        const btn = $('.btn-game');
+        btn.disabled = true;
+        
         try {
             const price = ethers.parseUnits("100", this.dec); 
             const allow = await this.c.f.allowance(this.u, CONFIG.MINING);
             if (allow < price) await (await this.c.f.approve(CONFIG.MINING, price)).wait();
             
-            const tx = this.c.m.spinWheel();
-            
-            // Animation Loop
+            // 1. Start Animation Loop
             let anim = setInterval(() => {
                 this.wheelState.angle += 0.3;
                 this.drawWheel(this.wheelState.angle);
             }, 20);
 
-            await tx;
-            clearInterval(anim);
+            // 2. Send Transaction
+            const tx = await this.c.m.spinWheel();
             
-            // Smooth stop
+            // 3. Wait for confirmation
+            await tx.wait();
+            
+            // 4. Stop Animation smoothly
+            clearInterval(anim);
             this.wheelState.angle += 10 + Math.random()*5;
             this.drawWheel(this.wheelState.angle);
 
             this.t("Résultat !"); this.upd();
         } catch(e) { this.shE(e); }
-        this.setL(false);
+        btn.disabled = false;
     }
     
     // FISHING
@@ -267,31 +291,35 @@ class Application {
         const line = $('#fishing-line');
         const hook = $('#fishing-hook');
         const status = $('#fishing-status');
+        const btn = $('.btn-game');
+        btn.disabled = true;
         
         line.style.height = '0px'; hook.style.top = '0px'; status.innerText = "Lancer...";
         
-        this.setL(true, "Pêche...");
         try {
             const price = ethers.parseUnits("50", this.dec); 
             const allow = await this.c.f.allowance(this.u, CONFIG.MINING);
             if (allow < price) await (await this.c.f.approve(CONFIG.MINING, price)).wait();
             
-            const tx = this.c.m.goFishing();
-            
-            // Animation
+            // 1. Start Animation
             setTimeout(() => {
                 line.style.height = '120px'; hook.style.top = '120px'; status.innerText = "Ligne lancée...";
             }, 500);
 
-            await tx;
+            // 2. Send Transaction
+            const tx = await this.c.m.goFishing();
             
+            // 3. Wait
+            await tx.wait();
+            
+            // 4. Result Animation
             status.innerText = "Ça mord !";
             hook.style.fontSize = "3rem";
             setTimeout(() => hook.style.fontSize = "2rem", 500);
 
             this.t("Pêche terminée !"); this.upd();
         } catch(e) { status.innerText="Erreur"; this.shE(e); }
-        this.setL(false);
+        btn.disabled = false;
     }
     
     async buyLotteryTicket() {
