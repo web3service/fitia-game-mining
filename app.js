@@ -34,7 +34,6 @@ const ERC20_ABI = [
     "function allowance(address, address) view returns (uint256)"
 ];
 
-// LOGIQUE
 class Application {
     constructor() {
         this.provider = null; this.signer = null; this.contracts = {}; this.user = null;
@@ -44,9 +43,11 @@ class Application {
         this.miningTimer = null; this.storageKey = "fitia_last_claim_time_v2"; 
         this.shopData = []; this.isLoadingShop = false; 
         this.vizContext = null; this.vizBars = [];
-        // AJOUT: Etats pour les jeux
+        // Ajouts pour les états des jeux
         this.wheelAngle = 0;
+        this.wheelInterval = null;
         this.isSpinning = false;
+        this.wheelCtx = null;
     }
 
     async init() {
@@ -88,7 +89,7 @@ class Application {
             this.initVisualizer();
             window.addEventListener('resize', () => this.resizeCanvas());
             
-            // AJOUT: Init Wheel
+            // Initialisation visuelle de la roue
             this.initWheel();
 
         } catch (e) { this.showToast("Erreur connexion", true); console.error(e); }
@@ -341,9 +342,8 @@ class Application {
         event.currentTarget.classList.add('active');
     }
 
-    // --- AJOUT: FONCTIONS JEUX AVEC ANIMATIONS ---
+    // --- FONCTIONS JEUX CORRIGÉES ---
 
-    // Helper: Afficher résultat
     showGameResult(elementId, message, isWin) {
         const el = document.getElementById(elementId);
         el.className = "game-result-box " + (isWin ? "win" : "lose");
@@ -358,36 +358,38 @@ class Application {
         if (!betVal || betVal <= 0) return this.showToast("Mise invalide", true);
         const amount = ethers.parseUnits(betVal, this.ftaDecimals);
         
-        // 1. Lancer Animation
+        // Désactiver boutons
+        const buttons = document.querySelectorAll('#game-wingo .game-options button');
+        buttons.forEach(b => b.disabled = true);
+        
+        // Lancer Animation IMMÉDIATEMENT
         const reel = document.getElementById('slot-reel');
         reel.classList.add('spinning');
         
-        this.setLoader(true, "Jeu...");
         try {
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < amount) await (await this.contracts.fta.approve(CONFIG.MINING, amount)).wait();
+            
+            // Transaction
             const tx = await this.contracts.mining.playWinGo(amount, type, choice);
             
-            // Attendre la transaction
+            // On attend la confirmation PENDANT que ça tourne
             await tx.wait();
 
-            // 2. Arrêter Animation et Résultat
+            // Arrêt Animation
             reel.classList.remove('spinning');
-            const randomNum = Math.floor(Math.random() * 10); // Simulé car résultat on-chain complexe à lire
+            const randomNum = Math.floor(Math.random() * 10);
             const finalOffset = -80 * randomNum; 
             reel.style.transform = `translateY(${finalOffset}px)`;
 
-            // Logique résultat simple pour l'affichage
-            const isWin = (type === 1 && randomNum < 5) || (type === 1 && randomNum >= 5); // Approximation visuelle
-            this.showGameResult('wingo-result', `Résultat: ${randomNum}\n${isWin ? 'Gagné!' : 'Perdu...'}`, isWin);
-            
+            this.showGameResult('wingo-result', `Résultat: ${randomNum}\nVérifiez le contrat`, true);
             this.updateData();
         } catch(e) { 
             reel.classList.remove('spinning'); 
             reel.style.transform = 'translateY(0px)'; 
             this.showError(e); 
         }
-        this.setLoader(false);
+        buttons.forEach(b => b.disabled = false);
     }
 
     // WHEEL
@@ -401,7 +403,7 @@ class Application {
     drawWheel(rotation) {
         const ctx = this.wheelCtx;
         if(!ctx) return;
-        const segments = ["10x", "2x", "5x", "1x", "50x", "0x", "3x", "JACKPOT"];
+        const seg = ["10x", "2x", "5x", "1x", "50x", "0x", "3x", "WIN"];
         const colors = ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6", "#ef4444", "#1e293b", "#ec4899", "#fbbf24"];
         
         ctx.clearRect(0, 0, 300, 300);
@@ -410,8 +412,8 @@ class Application {
         ctx.rotate(rotation);
         ctx.translate(-150, -150);
 
-        const step = (2 * Math.PI) / segments.length;
-        for(let i=0; i<segments.length; i++) {
+        const step = (2 * Math.PI) / seg.length;
+        for(let i=0; i<seg.length; i++) {
             ctx.beginPath();
             ctx.moveTo(150, 150);
             ctx.arc(150, 150, 140, i * step, (i + 1) * step);
@@ -421,7 +423,7 @@ class Application {
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
             ctx.save(); ctx.translate(150, 150); ctx.rotate(i * step + step / 2);
             ctx.textAlign = "right"; ctx.fillStyle = "#fff"; ctx.font = "bold 14px sans-serif";
-            ctx.fillText(segments[i], 110, 5);
+            ctx.fillText(seg[i], 110, 5);
             ctx.restore();
         }
         ctx.beginPath(); ctx.arc(150, 150, 20, 0, 2 * Math.PI); ctx.fillStyle = "#000"; ctx.fill();
@@ -431,32 +433,43 @@ class Application {
     async spinWheel() {
         if(this.isSpinning) return;
         this.isSpinning = true;
-        this.setLoader(true, "Roue...");
+        
+        // Désactiver bouton
+        const btn = document.querySelector('#game-wheel .btn-game');
+        btn.disabled = true;
+
+        // Lancer Animation IMMÉDIATEMENT
+        if (this.wheelInterval) clearInterval(this.wheelInterval);
+        this.wheelInterval = setInterval(() => {
+            this.wheelAngle += 0.2;
+            this.drawWheel(this.wheelAngle);
+        }, 20);
+
         try {
             const price = ethers.parseUnits("100", this.ftaDecimals); 
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < price) await (await this.contracts.fta.approve(CONFIG.MINING, price)).wait();
-            const tx = this.contracts.mining.spinWheel();
             
-            // Animation
-            let anim = setInterval(() => {
-                this.wheelAngle += 0.3;
-                this.drawWheel(this.wheelAngle);
-            }, 20);
-
-            await tx;
-            await tx.wait(); // Attendre confirmation
+            // Transaction
+            const tx = await this.contracts.mining.spinWheel();
             
-            clearInterval(anim);
+            // Attendre confirmation PENDANT que ça tourne
+            await tx.wait();
+            
             // Arrêt smooth
-            this.wheelAngle += 10 + Math.random()*5;
+            clearInterval(this.wheelInterval);
+            this.wheelAngle += 5; 
             this.drawWheel(this.wheelAngle);
 
-            this.showGameResult('wheel-result', "Roue terminée !\nVérifiez votre solde.", true);
+            this.showGameResult('wheel-result', "Roue tournée !", true);
             this.updateData();
-        } catch(e) { this.showError(e); }
+        } catch(e) {
+            clearInterval(this.wheelInterval);
+            this.showError(e);
+        }
+        
         this.isSpinning = false;
-        this.setLoader(false);
+        btn.disabled = false;
     }
     
     // FISHING
@@ -464,30 +477,37 @@ class Application {
         const line = document.getElementById('fishing-line');
         const hook = document.getElementById('fishing-hook');
         const status = document.getElementById('fishing-status');
+        const btn = document.querySelector('#game-fishing .btn-game');
+        btn.disabled = true;
         
+        // Reset visuel
         line.style.height = '0px'; hook.style.top = '0px'; status.innerText = "Lancer...";
         
-        this.setLoader(true, "Pêche...");
         try {
             const price = ethers.parseUnits("50", this.ftaDecimals); 
             const allow = await this.contracts.fta.allowance(this.user, CONFIG.MINING);
             if (allow < price) await (await this.contracts.fta.approve(CONFIG.MINING, price)).wait();
-            const tx = this.contracts.mining.goFishing();
             
-            // Animation
-            setTimeout(() => { line.style.height = '120px'; hook.style.top = '120px'; status.innerText = "Ligne lancée..."; }, 500);
-            
-            await tx;
+            // Lancer Animation IMMÉDIATEMENT
+            setTimeout(() => {
+                line.style.height = '120px'; hook.style.top = '120px'; status.innerText = "Ligne lancée...";
+            }, 500);
+
+            // Transaction
+            const tx = await this.contracts.mining.goFishing();
             await tx.wait();
             
+            // Résultat
             status.innerText = "Ça mord !";
-            hook.style.fontSize = "3rem"; // Pop effect
+            hook.style.fontSize = "3rem";
             setTimeout(() => hook.style.fontSize = "2rem", 500);
 
             this.showGameResult('fish-result', "Pêche réussie !", true);
             this.updateData();
-        } catch(e) { status.innerText="Erreur"; this.showError(e); }
-        this.setLoader(false);
+        } catch(e) { 
+            line.style.height = '0px'; hook.style.top = '0px'; status.innerText="Erreur"; this.showError(e); 
+        }
+        btn.disabled = false;
     }
     
     async buyLotteryTicket() {
@@ -532,7 +552,7 @@ class Application {
                     if (this.shopData[i]) powerDisplay = this.shopData[i].power.toFixed(5);
                     const div = document.createElement('div');
                     div.className = 'my-rig-card active';
-                    div.innerHTML = `<div class="rig-info"><h4>RIG ${i+1} <span style="opacity:0.7">x${machineCount.toString()}</span></h4><p>${powerDisplay} FTA/s</p></div><span class="rig-status-badge status-active">ACTIF</span>`;
+                    div.innerHTML = `<div class="rig-info"><h4>RIG ${i+1} <span style="opacity:0.5">x${machineCount.toString()}</span></h4><p>${powerDisplay} FTA/s</p></div><span class="rig-status-badge status-active">ACTIF</span>`;
                     container.appendChild(div);
                 }
             }
@@ -577,9 +597,7 @@ class Application {
         console.error(e);
         let msg = "Erreur inconnue";
         if(e.reason) msg = e.reason;
-        else if (e.error && e.error.reason) msg = e.error.reason;
-        if(msg.includes("Invalid bet amount")) msg = "Mise invalide ou contrat vide";
-        if(msg.includes("insufficient funds")) msg = "Fonds insuffisants";
+        if(msg.includes("Invalid bet amount")) msg = "Mise invalide";
         this.showToast(msg, true);
     }
 
