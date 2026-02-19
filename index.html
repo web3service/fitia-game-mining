@@ -105,7 +105,7 @@
                 </div>
             </div>
 
-            <!-- GAMES (AVEC VISUELS) -->
+            <!-- GAMES (AVEC AJOUTS VISUELS) -->
             <div id="view-games" class="view">
                 <h2 class="view-title">🎮 Game Center</h2>
                 
@@ -116,26 +116,28 @@
                     <button class="game-tab" onclick="App.showGame('lottery')">Loterie</button>
                 </div>
 
-                <!-- Win Go (Slot Machine Visuel) -->
+                <!-- Win Go (AJOUT: Slot Machine) -->
                 <div id="game-wingo" class="game-area active">
                     <p class="game-info">Deviner le numéro (0-9) ou Grand/Petit.</p>
                     
                     <div class="slot-machine">
                         <div class="slot-window">
                             <div class="slot-reel" id="slot-reel">
+                                <!-- Chiffres pour l'animation -->
                                 <span>5</span><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span>
                             </div>
                         </div>
                     </div>
+                    <div id="wingo-result" class="game-result-box hidden"></div>
 
                     <input type="number" id="wingo-bet" class="game-input" placeholder="Mise en FTA">
                     <div class="game-options">
-                        <button class="game-btn" onclick="App.playWinGo(1, 0)">Petit (0-4)</button>
-                        <button class="game-btn" onclick="App.playWinGo(1, 1)">Grand (5-9)</button>
+                        <button onclick="App.playWinGo(1, 0)">Petit (0-4)</button>
+                        <button onclick="App.playWinGo(1, 1)">Grand (5-9)</button>
                     </div>
                 </div>
 
-                <!-- Roue (Canvas Visuel) -->
+                <!-- Roue (AJOUT: Canvas) -->
                 <div id="game-wheel" class="game-area">
                     <p class="game-info">Tournez pour tenter de gagner le Jackpot !</p>
                     
@@ -143,27 +145,29 @@
                         <div class="wheel-pointer">▼</div>
                         <canvas id="wheel-canvas" width="300" height="300"></canvas>
                     </div>
+                    <div id="wheel-result" class="game-result-box hidden"></div>
                     
                     <div class="jackpot-display">Jackpot: <span id="wheel-jackpot">0</span> FTA</div>
-                    <button class="btn-game" onclick="App.spinWheel()">TOURNER (100 FTA)</button>
+                    <button class="btn-game" onclick="App.spinWheel()">Tourner (100 FTA)</button>
                 </div>
 
-                <!-- Pêche (Animation Visuelle) -->
+                <!-- Pêche (AJOUT: Animation ligne) -->
                 <div id="game-fishing" class="game-area">
-                    <p class="game-info">Lancez votre ligne.</p>
+                    <p class="game-info">Lancez votre ligne pour attraper des gains.</p>
                     
                     <div class="fishing-container">
                         <div class="fishing-line" id="fishing-line"></div>
                         <div class="fishing-hook" id="fishing-hook">🪝</div>
                     </div>
-                    <div class="fishing-status" id="fishing-status">En attente...</div>
+                    <div id="fishing-status" class="fishing-status">En attente...</div>
+                    <div id="fish-result" class="game-result-box hidden"></div>
                     
-                    <button class="btn-game" onclick="App.goFishing()">PÊCHER (50 FTA)</button>
+                    <button class="btn-game" onclick="App.goFishing()">Pêcher (50 FTA)</button>
                 </div>
 
                 <!-- Loterie -->
                 <div id="game-lottery" class="game-area">
-                    <p class="game-info">Achetez un ticket.</p>
+                    <p class="game-info">Achetez un ticket pour participer au tirage.</p>
                     <div class="jackpot-display">Pot: <span id="lottery-pot">0</span> FTA</div>
                     <button class="btn-game" onclick="App.buyLotteryTicket()">Acheter Ticket (50 FTA)</button>
                 </div>
