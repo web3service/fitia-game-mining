@@ -212,3 +212,11 @@ main::-webkit-scrollbar { display: none; }
 .game-result-box.lose { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); }
 @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
+/* --- AJOUT STYLE LOGO TOKEN --- */
+.token-logo {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+}

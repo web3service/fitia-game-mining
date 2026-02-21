@@ -1,9 +1,14 @@
+// ==========================================
 // CONFIGURATION
+// ==========================================
 const CONFIG = {
     MINING: "0xb7555D092b0B30D30552502f8a2674D48601b10F", 
     FTA: "0x535bBe393D64a60E14B731b7350675792d501623", 
     USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F", 
-    CHAIN_ID: 137
+    CHAIN_ID: 137,
+    //logos
+    LOGO_USDT: "https://cryptologos.cc/logos/tether-usdt-logo.png",
+    LOGO_FTA: "https://i.ibb.co/vvz2DDK5/20260207-190817.webp"
 };
 
 const MINING_ABI = [
@@ -81,6 +86,11 @@ class Application {
 
             this.checkReferral();
             document.getElementById('ref-link').value = window.location.origin + "?ref=" + this.user;
+
+            // --- AJOUT : CHARGEMENT DU LOGO FTA ---
+            const ftaLogoEl = document.getElementById('logo-fta-bal');
+            if(ftaLogoEl) ftaLogoEl.src = CONFIG.LOGO_FTA;
+            // --------------------------------------
 
             if (!localStorage.getItem(this.storageKey)) { localStorage.setItem(this.storageKey, Math.floor(Date.now() / 1000)); }
 
@@ -382,7 +392,7 @@ class Application {
             const finalOffset = -80 * randomNum; 
             reel.style.transform = `translateY(${finalOffset}px)`;
 
-            this.showGameResult('wingo-result', `Résultat: ${randomNum}\nVérifiez`, true);
+            this.showGameResult('wingo-result', `Résultat: ${randomNum}\nVérifiez le contrat`, true);
             this.updateData();
         } catch(e) { 
             reel.classList.remove('spinning'); 

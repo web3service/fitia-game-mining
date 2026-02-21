@@ -72,27 +72,24 @@
                     RÉCLAMER
                 </button>
 
-                    <div class="card balances-card">
-    <!-- USDT -->
-    <div class="row-between" style="align-items: center;">
-        <span style="display:flex; align-items:center; gap:8px;">
-            <!-- Ajout de width="20" height="20" -->
-            <img src="https://cryptologos.cc/logos/tether-usdt-logo.png" width="20" height="20" style="border-radius:50%;">
-            USDT
-        </span>
-        <span class="balance" id="bal-usdt">0.00</span>
-    </div>
-    
-    <!-- FTA -->
-    <div class="row-between" style="margin-top:12px; align-items: center;">
-        <span style="display:flex; align-items:center; gap:8px;">
-            <!-- Ajout de width="20" height="20" -->
-            <img id="Logo-bal-fta" src="https://i.ibb.co/vvz2DDK5/20260207-190817.webp" width="20" height="20" style="border-radius:50%;">
-            FTA
-        </span>
-        <span class="balance" id="bal-fta">0.00</span>
-    </div>
-</div>
+                <!-- BALANCES CARD MODIFIEE AVEC LOGOS -->
+                <div class="card balances-card">
+                    <!-- USDT -->
+                    <div class="row-between" style="align-items: center;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <img src="https://cryptologos.cc/logos/tether-usdt-logo.png" class="token-logo" alt="USDT">
+                            USDT
+                        </span>
+                        <span class="balance" id="bal-usdt">0.00</span>
+                    </div>
+                    <!-- FTA -->
+                    <div class="row-between" style="margin-top:12px; align-items: center;">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            <img id="logo-fta-bal" src="https://i.ibb.co/vvz2DDK5/20260207-190817.webp" class="token-logo" alt="FTA">
+                            FTA
+                        </span>
+                        <span class="balance" id="bal-fta">0.00</span>
+                    </div>
                 </div>
             </div>
 
@@ -117,7 +114,7 @@
                 </div>
             </div>
 
-            <!-- GAMES (AVEC AJOUTS VISUELS) -->
+            <!-- GAMES -->
             <div id="view-games" class="view">
                 <h2 class="view-title">🎮 Game Center</h2>
                 
@@ -128,14 +125,13 @@
                     <button class="game-tab" onclick="App.showGame('lottery')">Loterie</button>
                 </div>
 
-                <!-- Win Go (AJOUT: Slot Machine) -->
+                <!-- Win Go -->
                 <div id="game-wingo" class="game-area active">
                     <p class="game-info">Deviner le numéro (0-9) ou Grand/Petit.</p>
                     
                     <div class="slot-machine">
                         <div class="slot-window">
                             <div class="slot-reel" id="slot-reel">
-                                <!-- Chiffres pour l'animation -->
                                 <span>5</span><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span>
                             </div>
                         </div>
@@ -149,7 +145,7 @@
                     </div>
                 </div>
 
-                <!-- Roue (AJOUT: Canvas) -->
+                <!-- Roue -->
                 <div id="game-wheel" class="game-area">
                     <p class="game-info">Tournez pour tenter de gagner le Jackpot !</p>
                     
@@ -163,7 +159,7 @@
                     <button class="btn-game" onclick="App.spinWheel()">Tourner (100 FTA)</button>
                 </div>
 
-                <!-- Pêche (AJOUT: Animation ligne) -->
+                <!-- Pêche -->
                 <div id="game-fishing" class="game-area">
                     <p class="game-info">Lancez votre ligne pour attraper des gains.</p>
                     
