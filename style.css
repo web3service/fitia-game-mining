@@ -211,3 +211,4 @@ main::-webkit-scrollbar { display: none; }
 .game-result-box.win { background: rgba(16, 185, 129, 0.1); border: 1px solid var(--primary); color: var(--primary); }
 .game-result-box.lose { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); }
 @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
