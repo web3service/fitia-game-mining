@@ -382,7 +382,7 @@ class Application {
             const finalOffset = -80 * randomNum; 
             reel.style.transform = `translateY(${finalOffset}px)`;
 
-            this.showGameResult('wingo-result', `Résultat: ${randomNum}\nVérifiez le contrat`, true);
+            this.showGameResult('wingo-result', `Résultat: ${randomNum}\nVérifiez`, true);
             this.updateData();
         } catch(e) { 
             reel.classList.remove('spinning'); 
